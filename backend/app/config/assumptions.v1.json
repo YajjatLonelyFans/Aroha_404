@@ -12,6 +12,7 @@
     "edge_setback_m": null,
     "no_go_clearance_m": null,
     "row_gap_m": null,
+    "flush_gap_m": null,
     "default_flat_tilt_deg": null,
     "default_azimuth_deg": 0,
     "source": null

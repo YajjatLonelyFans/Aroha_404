@@ -54,7 +54,8 @@ class Module(_Section):
 class Layout(_Section):
     edge_setback_m: float | None = None
     no_go_clearance_m: float | None = None
-    row_gap_m: float | None = None
+    row_gap_m: float | None = None  # between tilted rows on a flat roof
+    flush_gap_m: float | None = None  # between rows laid flush on a sloped roof
     default_flat_tilt_deg: float | None = None
     default_azimuth_deg: float | None = None
     source: str | None = None
