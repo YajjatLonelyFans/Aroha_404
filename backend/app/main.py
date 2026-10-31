@@ -4,18 +4,21 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import PyMongoError
 
 from app import __version__
-from app.api.routes import health
+from app.api.routes import health, weather
 from app.core.assumptions import load_assumptions
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
 from app.core.settings import Settings, get_settings
 from app.db.client import create_client
 from app.db.indexes import ensure_indexes
+from app.integrations.weather.mock import MockWeatherProvider
+from app.integrations.weather.open_meteo import OpenMeteoProvider
 
 log = logging.getLogger(__name__)
 
@@ -40,9 +43,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except PyMongoError as exc:
                 # Keep serving so /api/health can report the problem.
                 log.error("Could not create MongoDB indexes: %s", exc)
+
+        app.state.http = httpx.AsyncClient()
+        if settings.use_mock_weather:
+            log.warning("USE_MOCK_WEATHER is on: weather responses are recorded data, labelled mock")
+            app.state.weather_provider = MockWeatherProvider()
+        else:
+            app.state.weather_provider = OpenMeteoProvider(
+                app.state.http, settings.open_meteo_archive_url, settings.open_meteo_forecast_url
+            )
         try:
             yield
         finally:
+            await app.state.http.aclose()
             if app.state.mongo is not None:
                 await app.state.mongo.close()
 
@@ -56,6 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api")
+    app.include_router(weather.router, prefix="/api")
     return app
 
 

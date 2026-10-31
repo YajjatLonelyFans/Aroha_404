@@ -11,6 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.domain.errors import DomainError
+
 
 class AppError(Exception):
     """Base error for anything the API reports to the client."""
@@ -46,6 +48,10 @@ def register_error_handlers(app: FastAPI) -> None:
             status_code=exc.status_code,
             content=error_body(exc.code, exc.message, exc.retryable, exc.details),
         )
+
+    @app.exception_handler(DomainError)
+    async def _domain_error(_: Request, exc: DomainError) -> JSONResponse:
+        return JSONResponse(status_code=422, content=error_body(exc.code, exc.message))
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

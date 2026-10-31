@@ -7,11 +7,12 @@ UTM zone 43N (EPSG:32643), which covers Delhi.
 from dataclasses import dataclass
 from typing import Any
 
+import shapely
 from pyproj import Geod, Transformer
 from shapely import make_valid
 from shapely.geometry import Polygon, box, mapping, shape
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import transform, unary_union
+from shapely.ops import unary_union
 
 from app.domain.errors import DomainError
 
@@ -41,11 +42,11 @@ class RoofGeometry:
 
 
 def to_metric(geom: BaseGeometry) -> BaseGeometry:
-    return transform(_TO_UTM.transform, geom)
+    return shapely.transform(geom, _TO_UTM.transform, interleaved=False)
 
 
 def to_wgs84(geom: BaseGeometry) -> BaseGeometry:
-    return transform(_TO_WGS84.transform, geom)
+    return shapely.transform(geom, _TO_WGS84.transform, interleaved=False)
 
 
 def geodesic_area_m2(polygon_wgs84: BaseGeometry) -> float:

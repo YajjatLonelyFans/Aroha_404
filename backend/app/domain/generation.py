@@ -10,12 +10,12 @@ carries no PV losses, so nothing is counted twice. Output is linear in kWp,
 so the work is done once per kWp ("specific yield") and scaled.
 """
 
-import calendar
 from dataclasses import dataclass
 
 import numpy as np
 
 from app.domain.errors import DomainError
+from app.domain.series import by_year_month
 
 
 @dataclass(frozen=True)
@@ -76,31 +76,8 @@ def specific_yield(
     Missing hours (NaN or absent rows) are skipped and counted. A month missing
     more than `max_missing_share` of its hours is excluded rather than filled.
     """
-    years = np.asarray(years, dtype=int)
-    months = np.asarray(months, dtype=int)
-    energy = np.asarray(energy_per_kwp, dtype=float)
-    if not (years.shape == months.shape == energy.shape):
-        raise DomainError("invalid_series", "Year, month and energy series differ in length.")
-    if energy.size == 0:
-        raise DomainError("invalid_series", "No hourly data.")
-
-    year_list = tuple(int(y) for y in np.unique(years))
-    totals = np.full((len(year_list), 12), np.nan)
-    missing = np.zeros((len(year_list), 12), dtype=int)
-    excluded: list[tuple[int, int]] = []
-
-    for i, year in enumerate(year_list):
-        for m in range(1, 13):
-            sel = energy[(years == year) & (months == m)]
-            expected = calendar.monthrange(year, m)[1] * 24
-            present = int(np.count_nonzero(~np.isnan(sel)))
-            missing[i, m - 1] = max(expected - present, 0)
-            if missing[i, m - 1] / expected > max_missing_share:
-                excluded.append((year, m))
-                continue
-            totals[i, m - 1] = float(np.nansum(sel))
-
-    return SpecificYield(year_list, totals, missing, tuple(excluded))
+    t = by_year_month(years, months, energy_per_kwp, max_missing_share, how="sum")
+    return SpecificYield(t.years, t.values, t.missing_hours, t.excluded)
 
 
 def _percentiles(values: np.ndarray) -> Percentiles:

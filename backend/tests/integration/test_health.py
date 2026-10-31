@@ -21,8 +21,9 @@ def test_health_without_mongo_is_degraded_but_alive():
     assert body["status"] == "degraded"
     assert body["dependencies"]["mongo"]["status"] == "not_configured"
     assert body["dependencies"]["open_meteo"]["status"] == "configured"
-    assert body["assumptions"]["complete"] is False
-    assert "module.wp" in body["assumptions"]["missing"]
+    assumptions = body["assumptions"]
+    assert assumptions["version"] == "v1"
+    assert assumptions["complete"] is (assumptions["missing"] == [])
 
 
 def test_placeholder_keys_count_as_not_configured():

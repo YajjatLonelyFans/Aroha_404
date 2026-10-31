@@ -14,6 +14,7 @@ numpy==2.5.4
 # Data and outbound HTTP
 pymongo==4.19.0
 httpx==0.28.1
+tenacity==9.2.1
 
 # Tests
 pytest==9.2.0

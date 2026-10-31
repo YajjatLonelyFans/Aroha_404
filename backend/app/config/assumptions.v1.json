@@ -1,12 +1,12 @@
 {
   "version": "v1",
   "module": {
-    "length_m": null,
-    "width_m": null,
-    "wp": null,
-    "gamma_per_c": null,
-    "noct_c": null,
-    "source": null
+    "length_m": 2.279,
+    "width_m": 1.134,
+    "wp": 550,
+    "gamma_per_c": -0.0035,
+    "noct_c": 45,
+    "source": "Sunova SS-550-72MDH mono PERC datasheet (Pmax temp. coeff. -0.35 %/degC, NOCT 45+/-2 degC, 2279 x 1134 x 35 mm), https://download.axilogi.com/Sunova/SS-535-550-72MDH.pdf, accessed 2026-11-01"
   },
   "layout": {
     "edge_setback_m": null,
@@ -24,10 +24,10 @@
     "source": null
   },
   "losses": {
-    "l_other_fraction": null,
+    "l_other_fraction": 0.15,
     "shading_by_level": { "none": 0, "partial": null, "heavy": null },
     "shading_cap_fraction": null,
-    "source": null
+    "source": "l_other: NREL PVWatts v5 default losses (Dobos 2014, NREL/TP-6A20-62641; same defaults in pvlib pvwatts_losses) without shading: soiling 2%, mismatch 2%, wiring 2%, connections 0.5%, LID 1.5%, nameplate 1%, availability 3% (combined 11.4%), times 96% nominal inverter efficiency (PVWatts default) = 15.0%. Temperature excluded (handled by gamma)."
   },
   "costs": {
     "cost_per_kwp_inr": null,
@@ -51,6 +51,12 @@
   "climatology": {
     "years": 10,
     "max_missing_share": 0.05
+  },
+  "forecast": {
+    "sunny_min_ratio": 0.9,
+    "cloudy_max_ratio": 0.6,
+    "rain_min_mm": 2.5,
+    "source": "rain_min_mm: IMD 'rainy day' definition (24-hour rainfall of 2.5 mm or more). Ratios (day plane-of-array sunlight vs a typical day of that month from the 10-year climatology): Aroha design choice, display labels only, never used in estimates."
   },
   "validation": {
     "min_outline_m2": null,

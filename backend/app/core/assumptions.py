@@ -106,6 +106,15 @@ class Climatology(_Section):
     max_missing_share: float
 
 
+class Forecast(_Section):
+    """Rule for labelling forecast days sunny / mixed / cloudy / rain."""
+
+    sunny_min_ratio: float | None = None  # day GTI ÷ typical day for the month
+    cloudy_max_ratio: float | None = None
+    rain_min_mm: float | None = None
+    source: str | None = None
+
+
 class Validation(_Section):
     min_outline_m2: float | None = None
     max_outline_m2: float | None = None
@@ -122,6 +131,7 @@ class Assumptions(_Section):
     tariff: Tariff
     seasons: dict[str, list[int]]
     climatology: Climatology
+    forecast: Forecast
     validation: Validation
 
     @field_validator("seasons")

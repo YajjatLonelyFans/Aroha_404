@@ -28,8 +28,13 @@ def test_shipped_file_loads():
     assert a.validation.delhi_bbox == (76.83, 28.40, 77.35, 28.89)
 
 
-def test_missing_fields_lists_nulls_and_empty_lists_only():
-    missing = load_assumptions().missing_fields()
+def test_missing_fields_lists_nulls_and_empty_lists_only(tmp_path):
+    data = _shipped()
+    data["module"]["wp"] = None
+    data["tariff"]["slabs"] = []
+    data["losses"]["shading_by_level"] = {"none": 0, "partial": None, "heavy": 0.2}
+    data["layout"]["default_azimuth_deg"] = 0
+    missing = load_assumptions(_write(tmp_path, data)).missing_fields()
     assert "module.wp" in missing
     assert "tariff.slabs" in missing
     assert "losses.shading_by_level.partial" in missing
@@ -45,17 +50,21 @@ def test_require_returns_set_value(tmp_path):
     assert a.require("layout.default_azimuth_deg") == 0
 
 
-def test_require_raises_with_field_name():
-    a = load_assumptions()
+def test_require_raises_with_field_name(tmp_path):
+    data = _shipped()
+    data["costs"]["cost_per_kwp_inr"] = None
+    a = load_assumptions(_write(tmp_path, data))
     with pytest.raises(AssumptionMissingError) as exc:
         a.require("costs.cost_per_kwp_inr")
     assert exc.value.field == "costs.cost_per_kwp_inr"
     assert "costs.cost_per_kwp_inr" in exc.value.message
 
 
-def test_require_treats_empty_list_as_missing():
+def test_require_treats_empty_list_as_missing(tmp_path):
+    data = _shipped()
+    data["tariff"]["slabs"] = []
     with pytest.raises(AssumptionMissingError):
-        load_assumptions().require("tariff.slabs")
+        load_assumptions(_write(tmp_path, data)).require("tariff.slabs")
 
 
 def test_unknown_key_is_rejected(tmp_path):
