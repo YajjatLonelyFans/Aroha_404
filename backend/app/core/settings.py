@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     meko_api_key: str = ""
     meko_enabled_default: bool = True
     meko_datapack: str = "aroha"  # created on first use if missing
+    meko_recall_timeout_s: float = 14.0  # past this, a chat turn continues without recalled notes
+    chat_max_per_minute: int = 6  # per user; protects the free LLM quota
 
     llm_provider: str = ""
     llm_api_key: str = ""

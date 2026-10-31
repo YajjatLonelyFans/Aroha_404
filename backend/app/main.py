@@ -1,11 +1,14 @@
 """App factory: settings, logging, CORS, error handlers, routers and startup tasks."""
 
+import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import PyMongoError
 
@@ -14,6 +17,7 @@ from app.api.routes import applications, assistant, geo, health, policy, roof, s
 from app.core.assumptions import load_assumptions
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
+from app.core.ratelimit import SlidingWindowLimiter
 from app.core.settings import Settings, get_settings, is_configured
 from app.db.client import create_client
 from app.db.indexes import ensure_indexes
@@ -95,9 +99,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.memory = MekoMcpProvider(settings.meko_mcp_url, settings.meko_api_key, settings.meko_datapack)
         else:
             log.warning("MEKO_API_KEY is not set; chat memory is off")
+
+        app.state.chat_limiter = SlidingWindowLimiter(settings.chat_max_per_minute)
+        warm = None
+        if isinstance(app.state.memory, MekoMcpProvider):
+            # Finding the datapack takes ~8 s; do it now so the first chat does not pay for it.
+            warm = asyncio.create_task(_warm_meko(app.state.memory))
         try:
             yield
         finally:
+            if warm is not None and not warm.done():
+                warm.cancel()
             await app.state.http.aclose()
             if app.state.mongo is not None:
                 await app.state.mongo.close()
@@ -111,10 +123,48 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     register_error_handlers(app)
+
+    app.add_middleware(TimingMiddleware)
     app.include_router(health.router, prefix="/api")
     for module in (users, geo, roof, weather, solar, policy, applications, assistant):
         app.include_router(module.router, prefix="/api")
     return app
+
+
+class TimingMiddleware:
+    """Adds X-Response-Time-ms and logs API timings.
+
+    Plain ASGI on purpose: Starlette's @app.middleware("http") makes the client wait
+    for background tasks, which would hold every chat reply until memories are saved.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        start = time.perf_counter()
+
+        async def send_with_timing(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                ms = round(1000 * (time.perf_counter() - start))
+                message.setdefault("headers", []).append((b"x-response-time-ms", str(ms).encode()))
+                if scope["path"].startswith("/api"):
+                    log.info("%s %s -> %d in %d ms", scope["method"], scope["path"], message["status"], ms)
+            await send(message)
+
+        await self.app(scope, receive, send_with_timing)
+
+
+async def _warm_meko(memory: MekoMcpProvider) -> None:
+    try:
+        async with memory.session() as ms:
+            await ms.datapack_id()
+        log.info("Meko warmed: datapack %s ready", memory.datapack_name)
+    except Exception as exc:  # warming is best effort; chat reports real failures itself
+        log.warning("Could not warm Meko at startup: %s", exc)
 
 
 app = create_app()

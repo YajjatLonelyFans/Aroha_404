@@ -62,6 +62,10 @@ class MekoSession:
         except MemoryUnavailable as exc:
             self.calls.append(MemoryCall(tool, _ms(start), False, exc.message))
             raise
+        except asyncio.CancelledError:
+            # Cut off by the caller's time budget; keep it visible in the agent log.
+            self.calls.append(MemoryCall(tool, _ms(start), False, "cancelled (time budget)"))
+            raise
         except Exception as exc:
             self.calls.append(MemoryCall(tool, _ms(start), False, type(exc).__name__))
             raise MemoryUnavailable(f"Memory service call {tool} failed.") from exc
@@ -95,24 +99,22 @@ class MekoSession:
         })
         return conv["id"]
 
-    async def search(self, conversation_id: str, queries: dict[str, str], k: int = 5) -> list[MemoryHit]:
-        dp = await self.datapack_id()
-        agent_ids = list(queries)
-        results = await asyncio.gather(*[
-            self._call("memory_search", {
-                "query": query, "conversation_id": conversation_id, "run_id": conversation_id,
-                "agent_id": agent_id, "limit": k, "datapack_id": dp,
-            })
-            for agent_id, query in queries.items()
-        ])
-        hits: dict[str, MemoryHit] = {}
-        for agent_id, data in zip(agent_ids, results):
-            for row in (data or {}).get("results", []):
-                # Meko search does not filter by agent_id, so keep only this agent's rows.
-                if row.get("agent_id") == agent_id and row["id"] not in hits:
-                    hits[row["id"]] = MemoryHit(row["id"], row.get("memory", ""), row.get("agent_id"),
-                                                row.get("metadata") or {}, row.get("score"))
-        return sorted(hits.values(), key=lambda h: -(h.score or 0))
+    async def search(self, conversation_id: str, query: str, agent_ids: list[str], k: int = 3) -> list[MemoryHit]:
+        # Meko search is scoped by conversation (run_id) but not by agent_id: one call returns
+        # every agent's rows for this user, so they are split here (~11 s for 1 call or 5).
+        data = await self._call("memory_search", {
+            "query": query, "conversation_id": conversation_id, "run_id": conversation_id,
+            "agent_id": agent_key("orchestrator"), "limit": k * len(agent_ids), "datapack_id": await self.datapack_id(),
+        })
+        per_agent: dict[str, int] = {}
+        hits = []
+        for row in sorted((data or {}).get("results", []), key=lambda r: -(r.get("score") or 0)):
+            agent_id = row.get("agent_id")
+            if agent_id in agent_ids and per_agent.get(agent_id, 0) < k:
+                per_agent[agent_id] = per_agent.get(agent_id, 0) + 1
+                hits.append(MemoryHit(row["id"], row.get("memory", ""), agent_id,
+                                      row.get("metadata") or {}, row.get("score")))
+        return hits
 
     async def add(self, conversation_id: str, agent_id: str, text: str, metadata: dict[str, Any]) -> str | None:
         data = await self._call("memory_add", {

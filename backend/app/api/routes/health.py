@@ -9,7 +9,7 @@ router = APIRouter(tags=["health"])
 @router.get("/health", response_model=HealthResponse)
 async def health(
     request: Request,
-    deep: bool = Query(False, description="Also call Open-Meteo to check it is reachable"),
+    deep: bool = Query(False, description="Also call Open-Meteo, Gemini (model lookup) and Meko once each"),
 ) -> HealthResponse:
     state = request.app.state
-    return await check_health(state.settings, state.mongo, state.assumptions, deep=deep)
+    return await check_health(state.settings, state.mongo, state.assumptions, deep=deep, memory=state.memory)

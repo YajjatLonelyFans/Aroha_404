@@ -66,7 +66,7 @@ def test_no_duplicates_even_when_recall_misses(api):
     api.memory.rows.extend(stored)
 
 
-def test_recall_query_adds_each_agents_topic(api):
+def test_recall_is_one_search_with_every_agents_topic(api):
     user_id = ready_user(api)
     seen = {}
     original = api.memory.session
@@ -79,9 +79,9 @@ def test_recall_query_adds_each_agents_topic(api):
                 s = await cm.__aenter__()
                 real = s.search
 
-                async def search(conv, queries, k=5):
-                    seen.update(queries)
-                    return await real(conv, queries, k)
+                async def search(conv, query, agent_ids, k=3):
+                    seen.setdefault("calls", []).append((query, list(agent_ids)))
+                    return await real(conv, query, agent_ids, k)
                 s.search = search
                 return s
 
@@ -91,8 +91,10 @@ def test_recall_query_adds_each_agents_topic(api):
 
     api.memory.session = spying_session
     chat(api, user_id, "Hi, where was I?")
-    assert set(seen) == {"aroha:roof", "aroha:weather", "aroha:financial", "aroha:policy", "aroha:application"}
-    assert "usable area" in seen["aroha:roof"] and "payback" in seen["aroha:financial"]
+    assert len(seen["calls"]) == 1
+    query, agent_ids = seen["calls"][0]
+    assert agent_ids == ["aroha:roof", "aroha:weather", "aroha:financial", "aroha:policy", "aroha:application"]
+    assert query.startswith("Hi, where was I?") and "usable area" in query and "payback" in query
 
 
 def test_question_routes_to_the_right_agent(api):

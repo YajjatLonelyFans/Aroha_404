@@ -63,7 +63,8 @@ def get_orchestrator(
     request: Request, store: StoreDep, weather: Annotated[WeatherService, Depends(get_weather_service)]
 ) -> Orchestrator:
     state = request.app.state
-    return Orchestrator(store, weather, state.llm, state.memory, PolicyService(store), ApplicationService(store))
+    return Orchestrator(store, weather, state.llm, state.memory, PolicyService(store), ApplicationService(store),
+                        recall_timeout_s=state.settings.meko_recall_timeout_s)
 
 
 def get_policy_service(store: StoreDep) -> PolicyService:

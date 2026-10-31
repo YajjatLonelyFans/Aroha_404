@@ -45,7 +45,9 @@ class Orchestrator:
         policy: PolicyService,
         applications: ApplicationService,
         clock: Callable[[], datetime] = utc_now,
+        recall_timeout_s: float = 14.0,
     ) -> None:
+        self._recall_timeout_s = recall_timeout_s
         self._store = store
         self._weather = weather
         self._policy = policy
@@ -70,52 +72,46 @@ class Orchestrator:
         shared: list[MemoryHit] = []
         conversation_id: str | None = None
 
-        # 1. Recall (Memory ON only).
+        # 1-2. Recall (Memory ON only) and load the saved records at the same time.
         use_memory = req.meko_enabled
         if use_memory and self._memory is None:
             use_memory, mem.error = False, "Memory is not configured."
             notes.append("Memory is not set up, so this chat starts fresh.")
-        elif use_memory:
+        records: dict[str, Any] = {}
+        timings: dict[str, int] = {}
+        phase = time.perf_counter()
+        if use_memory:
+            recall_task = asyncio.create_task(self._recall(req, user, agents))
+            records = await self._load_records(req.user_id)
+            timings["records_ms"] = _ms(phase)
             try:
-                async with self._memory.session() as ms:
-                    try:
-                        conversation_id = await ms.ensure_conversation(req.user_id, user.get("meko_conversation_id"))
-                        if conversation_id != user.get("meko_conversation_id"):
-                            await self._store.update(c.USERS, req.user_id, {"meko_conversation_id": conversation_id})
-                        queries = {agent_key(a): f"{req.message} ({RECALL_TOPICS[a]})" for a in agents}
-                        if {"policy", "application"} & set(agents):
-                            # Promoted lessons from the shared knowledge base, searched alongside recall.
-                            recalled, shared = await asyncio.gather(
-                                ms.search(conversation_id, queries, k=3),
-                                self._shared_lessons(ms, conversation_id, f"{req.message} ({SHARED_TOPIC})"),
-                            )
-                        else:
-                            recalled = await ms.search(conversation_id, queries, k=3)
-                    finally:
-                        meko_calls += [call.__dict__ for call in ms.calls]
-                mem.live = any(call["ok"] for call in meko_calls) and not self._memory.is_mock
+                conversation_id, recalled, shared, calls, timed_out = await recall_task
+                timings["recall_ms"] = _ms(phase)
+                meko_calls += calls
+                mem.live = any(call["ok"] for call in calls) and not self._memory.is_mock
                 mem.recalled, mem.shared = len(recalled), len(shared)
+                if timed_out:
+                    notes.append("Memory recall was slow, so earlier notes were skipped this turn; "
+                                 "your saved records were still used.")
             except MemoryUnavailable as exc:
-                use_memory, mem.error = False, exc.message
+                use_memory, mem.error, records = False, exc.message, {}
                 notes.append("Memory is unavailable right now, so this chat starts fresh.")
 
-        # 2. Context: saved records are only used when memory is on (resume).
+        # Saved records are only used when memory is on (resume).
         ctx = AgentContext(user_id=req.user_id, message=req.message, user=user,
-                           wants_forecast=wants_forecast(req.message), resumed=use_memory)
-        if use_memory:
-            ctx.property = await self._store.latest(c.PROPERTIES, {"user_id": req.user_id})
-            ctx.assessment = await self._store.latest(c.ROOF_ASSESSMENTS, {"user_id": req.user_id})
-            ctx.estimate = await self._store.latest(c.SOLAR_ESTIMATES, {"user_id": req.user_id})
-            ctx.application = await self._store.latest(c.APPLICATIONS, {"user_id": req.user_id})
-            ctx.recalled = recalled
-            ctx.shared_lessons = shared
+                           wants_forecast=wants_forecast(req.message), resumed=use_memory,
+                           recalled=recalled, shared_lessons=shared, **records)
 
         # 3. Run the chosen agents in parallel.
+        phase = time.perf_counter()
         outputs = await asyncio.gather(*[self._run_agent(a, ctx) for a in agents])
+        timings["agents_ms"] = _ms(phase)
 
         # 4-5. Compose with one LLM call, validate numbers, fall back to the template.
+        phase = time.perf_counter()
         sources = [f for o in outputs for f in o.facts] + [m.text for m in recalled + shared] + [req.message]
         reply, llm_info = await self._compose(req.message, outputs, recalled, sources, fresh=not use_memory)
+        timings["compose_ms"] = _ms(phase)
 
         # 6. Log the run; memory writes happen after the reply is sent.
         candidates = self._candidates(outputs, recalled, user) if use_memory and conversation_id else []
@@ -125,7 +121,8 @@ class Orchestrator:
             "user_id": req.user_id,
             "agents": list(agents),
             "status": "ok",
-            "latency_ms": round(1000 * (time.perf_counter() - started)),
+            "latency_ms": _ms(started),
+            "timings": timings,
             "meko": {"enabled": req.meko_enabled, "live": mem.live, "is_mock": mem.is_mock,
                      "error": mem.error, "calls": meko_calls},
             "llm": llm_info.model_dump(),
@@ -139,6 +136,39 @@ class Orchestrator:
             memory=mem, llm=llm_info, notes=notes,
         )
         return response, job
+
+    async def _load_records(self, user_id: str) -> dict[str, Any]:
+        keys = {"property": c.PROPERTIES, "assessment": c.ROOF_ASSESSMENTS,
+                "estimate": c.SOLAR_ESTIMATES, "application": c.APPLICATIONS}
+        docs = await asyncio.gather(*[self._store.latest(col, {"user_id": user_id}) for col in keys.values()])
+        return dict(zip(keys, docs))
+
+    async def _recall(
+        self, req: ChatRequest, user: dict, agents: list[AgentName]
+    ) -> tuple[str, list[MemoryHit], list[MemoryHit], list[dict], bool]:
+        """(conversation id, recalled, shared lessons, calls, timed out). Raises MemoryUnavailable."""
+        recalled: list[MemoryHit] = []
+        shared: list[MemoryHit] = []
+        timed_out = False
+        async with self._memory.session() as ms:
+            try:
+                conversation_id = await ms.ensure_conversation(req.user_id, user.get("meko_conversation_id"))
+                if conversation_id != user.get("meko_conversation_id"):
+                    await self._store.update(c.USERS, req.user_id, {"meko_conversation_id": conversation_id})
+                query = f"{req.message} ({'; '.join(RECALL_TOPICS[a] for a in agents)})"
+                searches = [ms.search(conversation_id, query, [agent_key(a) for a in agents], k=3)]
+                if {"policy", "application"} & set(agents):
+                    # Promoted lessons from the shared knowledge base, searched alongside recall.
+                    searches.append(self._shared_lessons(ms, conversation_id, f"{req.message} ({SHARED_TOPIC})"))
+                try:
+                    found = await asyncio.wait_for(asyncio.gather(*searches), self._recall_timeout_s)
+                    recalled = found[0]
+                    shared = found[1] if len(found) > 1 else []
+                except TimeoutError:
+                    timed_out = True
+            finally:
+                calls = [call.__dict__ for call in ms.calls]
+        return conversation_id, recalled, shared, calls, timed_out
 
     async def _run_agent(self, agent: AgentName, ctx: AgentContext) -> AgentOutput:
         try:
@@ -240,6 +270,10 @@ class Orchestrator:
                 await self._store.update(c.USERS, user["id"], {"meko_saved": user.get("meko_saved", []) + saved})
 
         return commit
+
+
+def _ms(start: float) -> int:
+    return round(1000 * (time.perf_counter() - start))
 
 
 def saved_key(agent_id: str, record_id: str | None) -> str:

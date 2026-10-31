@@ -45,8 +45,8 @@ class MemorySession(Protocol):
 
     async def ensure_conversation(self, user_id: str, existing: str | None) -> str: ...
 
-    async def search(self, conversation_id: str, queries: dict[str, str], k: int = 5) -> list[MemoryHit]:
-        """One search per agent id ({agent_id: query}); only that agent's memories are kept."""
+    async def search(self, conversation_id: str, query: str, agent_ids: list[str], k: int = 3) -> list[MemoryHit]:
+        """This user's memories for the given agents, at most k per agent, best first."""
         ...
 
     async def add(

@@ -17,10 +17,10 @@ class MockMemorySession:
         self.calls.append(MemoryCall("mock.conversation_create", 0, True))
         return existing or f"mock-conv-{user_id}"
 
-    async def search(self, conversation_id: str, queries: dict[str, str], k: int = 5) -> list[MemoryHit]:
+    async def search(self, conversation_id: str, query: str, agent_ids: list[str], k: int = 3) -> list[MemoryHit]:
         self.calls.append(MemoryCall("mock.memory_search", 0, True))
         out: list[MemoryHit] = []
-        for agent_id in queries:
+        for agent_id in agent_ids:
             rows = [h for conv, h in self._p.rows if conv == conversation_id and h.agent_id == agent_id]
             out += list(reversed(rows))[:k]
         return out
