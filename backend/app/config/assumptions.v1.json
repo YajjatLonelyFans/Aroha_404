@@ -1,0 +1,59 @@
+{
+  "version": "v1",
+  "module": {
+    "length_m": null,
+    "width_m": null,
+    "wp": null,
+    "gamma_per_c": null,
+    "noct_c": null,
+    "source": null
+  },
+  "layout": {
+    "edge_setback_m": null,
+    "no_go_clearance_m": null,
+    "row_gap_m": null,
+    "default_flat_tilt_deg": null,
+    "default_azimuth_deg": 0,
+    "source": null
+  },
+  "capacity": {
+    "shading_haircut_fraction": null,
+    "small_area_m2": null,
+    "many_obstructions_fraction": null,
+    "source": null
+  },
+  "losses": {
+    "l_other_fraction": null,
+    "shading_by_level": { "none": 0, "partial": null, "heavy": null },
+    "shading_cap_fraction": null,
+    "source": null
+  },
+  "costs": {
+    "cost_per_kwp_inr": null,
+    "source": null,
+    "as_of": null
+  },
+  "tariff": {
+    "discom": "BRPL",
+    "slabs": [],
+    "fixed_charges_inr": null,
+    "export_rate_inr": null,
+    "source": null,
+    "as_of": null
+  },
+  "seasons": {
+    "winter": [12, 1, 2],
+    "summer": [3, 4, 5, 6],
+    "monsoon": [7, 8, 9],
+    "post_monsoon": [10, 11]
+  },
+  "climatology": {
+    "years": 10,
+    "max_missing_share": 0.05
+  },
+  "validation": {
+    "min_outline_m2": null,
+    "max_outline_m2": null,
+    "delhi_bbox": [76.83, 28.40, 77.35, 28.89]
+  }
+}

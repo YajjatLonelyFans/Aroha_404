@@ -1,0 +1,11 @@
+"""Collection names for `aroha_db` (see docs/DATABASE_SCHEMA.md)."""
+
+USERS = "users"
+PROPERTIES = "properties"
+ROOF_ASSESSMENTS = "roof_assessments"
+WEATHER_RECORDS = "weather_records"
+WEATHER_FORECASTS = "weather_forecasts"
+SOLAR_ESTIMATES = "solar_estimates"
+POLICY_RECORDS = "policy_records"
+APPLICATIONS = "applications"
+AGENT_LOGS = "agent_logs"
