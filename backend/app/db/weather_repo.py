@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from pymongo.asynchronous.database import AsyncDatabase
 
 from app.db import collections as c
@@ -27,12 +28,11 @@ class MongoWeatherRepo:
         return await self._records.find_one({**key, "kind": "climatology"})
 
     async def save_climatology(self, key: dict[str, Any], doc: dict[str, Any]) -> str:
-        saved = await self._records.find_one_and_replace(
-            {**key, "kind": "climatology"},
-            doc,
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
+        async def save() -> dict[str, Any]:
+            return await self._records.find_one_and_replace(
+                {**key, "kind": "climatology"}, doc, upsert=True, return_document=ReturnDocument.AFTER,
+            )
+        saved = await _retry_on_race(save)
         return str(saved["_id"])
 
     async def find_current(self, key: dict[str, Any], now: datetime) -> dict[str, Any] | None:
@@ -40,13 +40,22 @@ class MongoWeatherRepo:
         return await self._records.find_one({**key, "kind": "current", "expires_at": {"$gt": now}})
 
     async def save_current(self, key: dict[str, Any], doc: dict[str, Any]) -> None:
-        await self._records.replace_one({**key, "kind": "current"}, doc, upsert=True)
+        await _retry_on_race(lambda: self._records.replace_one({**key, "kind": "current"}, doc, upsert=True))
 
     async def find_forecast(self, key: dict[str, Any], now: datetime) -> dict[str, Any] | None:
         return await self._forecasts.find_one({**key, "expires_at": {"$gt": now}})
 
     async def save_forecast(self, key: dict[str, Any], doc: dict[str, Any]) -> None:
         await self._forecasts.replace_one(key, doc, upsert=True)
+
+
+async def _retry_on_race(save):  # type: ignore[no-untyped-def]
+    """Two requests can upsert the same cache key at once; the loser hits the unique index.
+    Retrying once then matches the winner's document and replaces it."""
+    try:
+        return await save()
+    except DuplicateKeyError:
+        return await save()
 
 
 class NoCacheWeatherRepo:

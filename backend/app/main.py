@@ -15,9 +15,9 @@ from pymongo.errors import PyMongoError
 from app import __version__
 from app.api.routes import applications, assistant, geo, health, policy, roof, solar, users, weather
 from app.core.assumptions import load_assumptions
-from app.core.errors import register_error_handlers
+from app.core.errors import UnexpectedErrorMiddleware, register_error_handlers
 from app.core.logging import setup_logging
-from app.core.ratelimit import SlidingWindowLimiter
+from app.core.ratelimit import ChatLimiter
 from app.core.settings import Settings, get_settings, is_configured
 from app.db.client import create_client
 from app.db.indexes import ensure_indexes
@@ -100,7 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else:
             log.warning("MEKO_API_KEY is not set; chat memory is off")
 
-        app.state.chat_limiter = SlidingWindowLimiter(settings.chat_max_per_minute)
+        app.state.chat_limiter = ChatLimiter(settings.chat_max_per_minute, settings.chat_max_total_per_minute)
         warm = None
         if isinstance(app.state.memory, MekoMcpProvider):
             # Finding the datapack takes ~8 s; do it now so the first chat does not pay for it.
@@ -115,6 +115,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await app.state.mongo.close()
 
     app = FastAPI(title="Aroha API", version=__version__, lifespan=lifespan)
+    # The last one added is the outermost: Timing → CORS → UnexpectedError → routes.
+    # UnexpectedError sits inside CORS so even a 500 carries CORS headers.
+    app.add_middleware(UnexpectedErrorMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -122,9 +125,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    register_error_handlers(app)
-
     app.add_middleware(TimingMiddleware)
+    register_error_handlers(app)
     app.include_router(health.router, prefix="/api")
     for module in (users, geo, roof, weather, solar, policy, applications, assistant):
         app.include_router(module.router, prefix="/api")

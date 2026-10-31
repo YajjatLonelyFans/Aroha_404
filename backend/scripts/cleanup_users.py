@@ -53,7 +53,11 @@ async def main(apply: bool, only: list[str]) -> int:
     memory = MekoMcpProvider(s.meko_mcp_url, s.meko_api_key, s.meko_datapack) if is_configured(s.meko_api_key) else None
     for u in users:
         uid, conv = str(u["_id"]), u.get("meko_conversation_id")
-        if conv and memory is not None:
+        if conv and memory is None:
+            # Deleting the user would lose the only link to their Meko memories, orphaning them.
+            print(f"  {uid}: has Meko memories but MEKO_API_KEY is not set; skipped (nothing deleted)")
+            continue
+        if conv:
             try:
                 async with memory.session() as ms:
                     dp = await ms.datapack_id()

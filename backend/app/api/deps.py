@@ -64,7 +64,7 @@ def get_orchestrator(
 ) -> Orchestrator:
     state = request.app.state
     return Orchestrator(store, weather, state.llm, state.memory, PolicyService(store), ApplicationService(store),
-                        recall_timeout_s=state.settings.meko_recall_timeout_s)
+                        recall_timeout_s=state.settings.meko_recall_timeout_s, limiter=state.chat_limiter)
 
 
 def get_policy_service(store: StoreDep) -> PolicyService:

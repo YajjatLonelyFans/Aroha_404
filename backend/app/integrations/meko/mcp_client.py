@@ -73,20 +73,20 @@ class MekoSession:
         return data
 
     async def datapack_id(self) -> str:
-        if self._p.datapack_id:
-            return self._p.datapack_id
+        return await self._p.resolve_datapack_id()
+
+    async def lookup_or_create_datapack(self) -> str:
+        """Run only by the provider's single shared resolution task."""
         boot = await self._call("conversation_create", {
             "agent_id": agent_key("orchestrator"), "title": "Aroha datapack lookup", "session_id": "aroha-bootstrap",
         })
         found = await self._call("datapack_search", {"conversation_id": boot["id"], "name": self._p.datapack_name})
         packs = found.get("datapacks") or []
         if packs:
-            self._p.datapack_id = packs[0]["datapack_id"]
-        else:
-            made = await self._call("datapack_create", {"name": self._p.datapack_name, "conversation_id": boot["id"]})
-            self._p.datapack_id = made["datapack_id"]
-            log.info("Created Meko datapack %s", self._p.datapack_name)
-        return self._p.datapack_id
+            return packs[0]["datapack_id"]
+        made = await self._call("datapack_create", {"name": self._p.datapack_name, "conversation_id": boot["id"]})
+        log.info("Created Meko datapack %s", self._p.datapack_name)
+        return made["datapack_id"]
 
     async def ensure_conversation(self, user_id: str, existing: str | None) -> str:
         if existing:
@@ -100,21 +100,25 @@ class MekoSession:
         return conv["id"]
 
     async def search(self, conversation_id: str, query: str, agent_ids: list[str], k: int = 3) -> list[MemoryHit]:
-        # Meko search is scoped by conversation (run_id) but not by agent_id: one call returns
-        # every agent's rows for this user, so they are split here (~11 s for 1 call or 5).
-        data = await self._call("memory_search", {
-            "query": query, "conversation_id": conversation_id, "run_id": conversation_id,
-            "agent_id": agent_key("orchestrator"), "limit": k * len(agent_ids), "datapack_id": await self.datapack_id(),
-        })
-        per_agent: dict[str, int] = {}
-        hits = []
-        for row in sorted((data or {}).get("results", []), key=lambda r: -(r.get("score") or 0)):
-            agent_id = row.get("agent_id")
-            if agent_id in agent_ids and per_agent.get(agent_id, 0) < k:
-                per_agent[agent_id] = per_agent.get(agent_id, 0) + 1
-                hits.append(MemoryHit(row["id"], row.get("memory", ""), agent_id,
-                                      row.get("metadata") or {}, row.get("score")))
-        return hits
+        # One search per agent, in parallel. Meko's docs say reads are scoped to the exact
+        # agent_id; the 1 Nov 2026 spike saw other agents' rows come back too. Searching under
+        # each agent's own id and keeping only that agent's rows is correct either way, gives
+        # each agent its own k, and costs no extra time (~11 s for 1 call or 5 in parallel).
+        dp = await self.datapack_id()
+        results = await asyncio.gather(*[
+            self._call("memory_search", {
+                "query": query, "conversation_id": conversation_id, "run_id": conversation_id,
+                "agent_id": agent_id, "limit": k, "datapack_id": dp,
+            })
+            for agent_id in agent_ids
+        ])
+        hits: dict[str, MemoryHit] = {}
+        for agent_id, data in zip(agent_ids, results):
+            rows = [r for r in (data or {}).get("results", []) if r.get("agent_id") == agent_id]
+            for row in sorted(rows, key=lambda r: -(r.get("score") or 0))[:k]:
+                hits.setdefault(row["id"], MemoryHit(row["id"], row.get("memory", ""), agent_id,
+                                                     row.get("metadata") or {}, row.get("score")))
+        return sorted(hits.values(), key=lambda h: -(h.score or 0))
 
     async def add(self, conversation_id: str, agent_id: str, text: str, metadata: dict[str, Any]) -> str | None:
         data = await self._call("memory_add", {
@@ -154,6 +158,26 @@ class MekoMcpProvider:
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self.datapack_name = datapack_name
         self.datapack_id: str | None = None  # found or created on first use, then cached
+        self._datapack_task: asyncio.Task[str] | None = None
+
+    async def resolve_datapack_id(self) -> str:
+        """Find or create the datapack exactly once, however many callers ask at the same time.
+
+        The lookup runs as one shared task with its own session, shielded from callers, so a
+        caller that times out does not cancel it, and two callers can never both create it.
+        """
+        if self.datapack_id:
+            return self.datapack_id
+        task = self._datapack_task
+        if task is None or (task.done() and (task.cancelled() or task.exception() is not None)):
+            self._datapack_task = asyncio.create_task(self._lookup())
+        return await asyncio.shield(self._datapack_task)
+
+    async def _lookup(self) -> str:
+        async with self.session() as ms:
+            datapack_id = await ms.lookup_or_create_datapack()
+        self.datapack_id = datapack_id
+        return datapack_id
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator[MekoSession]:
@@ -163,8 +187,10 @@ class MekoMcpProvider:
             read, write = await stack.enter_async_context(streamable_http_client(self._url, http_client=http))
             client = await stack.enter_async_context(ClientSession(read, write))
             await asyncio.wait_for(client.initialize(), CONNECT_TIMEOUT_S)
-        except Exception as exc:
+        except BaseException as exc:  # includes cancellation by a caller's time budget
             await _close(stack)
+            if not isinstance(exc, Exception):
+                raise
             log.warning("Could not connect to Meko: %s", exc)
             raise MemoryUnavailable("The memory service is not reachable.") from exc
         try:

@@ -8,7 +8,7 @@ from pymongo.errors import ServerSelectionTimeoutError
 
 from app.api.deps import get_store
 from app.core.assumptions import load_assumptions
-from app.core.ratelimit import RateLimited, SlidingWindowLimiter
+from app.core.ratelimit import ChatLimiter, RateLimited, SlidingWindowLimiter
 from app.core.settings import Settings
 from app.integrations.llm.gemini import GEMINI_URL
 from app.integrations.meko.mock import MockMemoryProvider
@@ -89,7 +89,7 @@ def test_slow_recall_is_cut_off_but_records_still_resume(api):
 
 
 def test_chat_is_rate_limited_per_user(api):
-    api.client.app.state.chat_limiter = SlidingWindowLimiter(2)
+    api.client.app.state.chat_limiter = ChatLimiter(per_user=2, total=100)
     user_id = ready_user(api)
     chat(api, user_id, "How many panels fit?")
     chat(api, user_id, "How many panels fit?")

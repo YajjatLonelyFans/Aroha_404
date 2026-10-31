@@ -63,6 +63,10 @@ async def _open_meteo_status(settings: Settings, deep: bool) -> DependencyStatus
 async def _llm_status(settings: Settings, deep: bool) -> DependencyStatus:
     status = _config_status(settings.llm_provider, settings.llm_api_key, settings.llm_model,
                             hint="Set LLM_PROVIDER, LLM_API_KEY and LLM_MODEL", is_mock=settings.use_mock_llm)
+    if status.status == "configured" and not status.is_mock and settings.llm_provider.lower() != "gemini":
+        # Matches main.py, which only builds a Gemini client; never send another provider's key to Google.
+        return DependencyStatus(status="not_configured",
+                                detail=f"LLM_PROVIDER '{settings.llm_provider}' is not supported; use 'gemini'")
     if not deep or status.status != "configured" or status.is_mock:
         return status
     # Looking up the model checks the key and model name without spending generation quota.

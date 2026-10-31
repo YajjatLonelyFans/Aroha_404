@@ -21,6 +21,7 @@ from app.agents.orchestrator.privacy import privacy_problem
 from app.agents.orchestrator.reply_validator import unknown_numbers
 from app.agents.orchestrator.routing import RECALL_TOPICS, SHARED_TOPIC, plan, wants_forecast
 from app.core.errors import AppError, NotFoundError
+from app.core.ratelimit import ChatLimiter
 from app.db import collections as c
 from app.db.store import DocumentStore
 from app.integrations.llm.base import LLMProvider, LLMRateLimited, LLMUnavailable
@@ -45,9 +46,11 @@ class Orchestrator:
         policy: PolicyService,
         applications: ApplicationService,
         clock: Callable[[], datetime] = utc_now,
-        recall_timeout_s: float = 14.0,
+        recall_timeout_s: float = 18.0,
+        limiter: ChatLimiter | None = None,
     ) -> None:
         self._recall_timeout_s = recall_timeout_s
+        self._limiter = limiter
         self._store = store
         self._weather = weather
         self._policy = policy
@@ -62,6 +65,8 @@ class Orchestrator:
         user = await self._store.get(c.USERS, req.user_id)
         if user is None:
             raise NotFoundError("User")
+        if self._limiter is not None:
+            self._limiter.check(req.user_id)  # only real users count, so ids cannot be invented to grow it
 
         agents = plan(req.message)
         notes: list[str] = []
@@ -82,7 +87,13 @@ class Orchestrator:
         phase = time.perf_counter()
         if use_memory:
             recall_task = asyncio.create_task(self._recall(req, user, agents))
-            records = await self._load_records(req.user_id)
+            try:
+                records = await self._load_records(req.user_id)
+            except BaseException:
+                # Do not leave the Meko session running behind a failed request.
+                recall_task.cancel()
+                await asyncio.gather(recall_task, return_exceptions=True)
+                raise
             timings["records_ms"] = _ms(phase)
             try:
                 conversation_id, recalled, shared, calls, timed_out = await recall_task
@@ -145,29 +156,35 @@ class Orchestrator:
 
     async def _recall(
         self, req: ChatRequest, user: dict, agents: list[AgentName]
-    ) -> tuple[str, list[MemoryHit], list[MemoryHit], list[dict], bool]:
-        """(conversation id, recalled, shared lessons, calls, timed out). Raises MemoryUnavailable."""
+    ) -> tuple[str | None, list[MemoryHit], list[MemoryHit], list[dict], bool]:
+        """(conversation id, recalled, shared lessons, calls, timed out). Raises MemoryUnavailable.
+
+        The whole recall (connect, conversation, searches) shares one time budget. Past it the
+        turn goes on with the saved records; the conversation id is kept when already known."""
+        conversation_id: str | None = user.get("meko_conversation_id")
         recalled: list[MemoryHit] = []
         shared: list[MemoryHit] = []
+        calls: list[dict] = []
         timed_out = False
-        async with self._memory.session() as ms:
-            try:
-                conversation_id = await ms.ensure_conversation(req.user_id, user.get("meko_conversation_id"))
-                if conversation_id != user.get("meko_conversation_id"):
-                    await self._store.update(c.USERS, req.user_id, {"meko_conversation_id": conversation_id})
-                query = f"{req.message} ({'; '.join(RECALL_TOPICS[a] for a in agents)})"
-                searches = [ms.search(conversation_id, query, [agent_key(a) for a in agents], k=3)]
-                if {"policy", "application"} & set(agents):
-                    # Promoted lessons from the shared knowledge base, searched alongside recall.
-                    searches.append(self._shared_lessons(ms, conversation_id, f"{req.message} ({SHARED_TOPIC})"))
-                try:
-                    found = await asyncio.wait_for(asyncio.gather(*searches), self._recall_timeout_s)
-                    recalled = found[0]
-                    shared = found[1] if len(found) > 1 else []
-                except TimeoutError:
-                    timed_out = True
-            finally:
-                calls = [call.__dict__ for call in ms.calls]
+        try:
+            async with asyncio.timeout(self._recall_timeout_s):
+                async with self._memory.session() as ms:
+                    try:
+                        conversation_id = await ms.ensure_conversation(req.user_id, conversation_id)
+                        if conversation_id != user.get("meko_conversation_id"):
+                            await self._store.update(c.USERS, req.user_id, {"meko_conversation_id": conversation_id})
+                        searches = [ms.search(conversation_id, f"{req.message} ({'; '.join(RECALL_TOPICS[a] for a in agents)})",
+                                              [agent_key(a) for a in agents], k=3)]
+                        if {"policy", "application"} & set(agents):
+                            # Promoted lessons from the shared knowledge base, searched alongside recall.
+                            searches.append(self._shared_lessons(ms, conversation_id, f"{req.message} ({SHARED_TOPIC})"))
+                        found = await asyncio.gather(*searches)
+                        recalled = found[0]
+                        shared = found[1] if len(found) > 1 else []
+                    finally:
+                        calls = [call.__dict__ for call in ms.calls]
+        except TimeoutError:
+            timed_out = True
         return conversation_id, recalled, shared, calls, timed_out
 
     async def _run_agent(self, agent: AgentName, ctx: AgentContext) -> AgentOutput:
