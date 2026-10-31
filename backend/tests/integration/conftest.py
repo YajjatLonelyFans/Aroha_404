@@ -6,7 +6,8 @@ from fastapi.testclient import TestClient
 from app.api.deps import get_store, weather_repo
 from app.core.settings import Settings
 from app.main import create_app
-from tests.fakes import FakeGeocoder, FakeWeatherProvider, FakeWeatherRepo, MemoryStore
+from app.integrations.meko.mock import MockMemoryProvider
+from tests.fakes import FakeGeocoder, FakeLLM, FakeWeatherProvider, FakeWeatherRepo, MemoryStore
 from tests.weather_data import JOURNEY_READY, assumptions
 
 
@@ -16,6 +17,8 @@ class Api:
     store: MemoryStore
     weather: FakeWeatherProvider
     geocoder: FakeGeocoder
+    llm: FakeLLM
+    memory: MockMemoryProvider
 
     def set_assumptions(self, **sections):
         self.client.app.state.assumptions = assumptions(**{**JOURNEY_READY, **sections})
@@ -29,8 +32,10 @@ def api():
     app.dependency_overrides[get_store] = lambda: store
     app.dependency_overrides[weather_repo] = lambda: repo
     with TestClient(app) as client:
-        weather, geocoder = FakeWeatherProvider(), FakeGeocoder()
+        weather, geocoder, llm, memory = FakeWeatherProvider(), FakeGeocoder(), FakeLLM(), MockMemoryProvider()
         app.state.weather_provider = weather
         app.state.geocoder = geocoder
+        app.state.llm = llm
+        app.state.memory = memory
         app.state.assumptions = assumptions(**JOURNEY_READY)
-        yield Api(client, store, weather, geocoder)
+        yield Api(client, store, weather, geocoder, llm, memory)

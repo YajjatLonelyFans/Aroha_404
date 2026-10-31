@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import PyMongoError
 
 from app import __version__
-from app.api.routes import geo, health, roof, solar, users, weather
+from app.api.routes import assistant, geo, health, roof, solar, users, weather
 from app.core.assumptions import load_assumptions
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
@@ -20,6 +20,10 @@ from app.db.indexes import ensure_indexes
 from app.integrations.geocoding.base import UnconfiguredGeocoder
 from app.integrations.geocoding.mock import MockGeocoder
 from app.integrations.geocoding.nominatim import NominatimGeocoder
+from app.integrations.llm.gemini import GeminiProvider
+from app.integrations.llm.mock import MockLLM
+from app.integrations.meko.mcp_client import MekoMcpProvider
+from app.integrations.meko.mock import MockMemoryProvider
 from app.integrations.weather.mock import MockWeatherProvider
 from app.integrations.weather.open_meteo import OpenMeteoProvider
 
@@ -65,6 +69,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else:
             log.warning("NOMINATIM_USER_AGENT is not set; address search is off (pins still work)")
             app.state.geocoder = UnconfiguredGeocoder()
+
+        app.state.llm = None
+        if settings.use_mock_llm:
+            log.warning("USE_MOCK_LLM is on: chat replies come from a labelled mock")
+            app.state.llm = MockLLM()
+        elif settings.llm_provider.lower() == "gemini" and all(
+            is_configured(v) for v in (settings.llm_api_key, settings.llm_model)
+        ):
+            app.state.llm = GeminiProvider(app.state.http, settings.llm_api_key, settings.llm_model)
+        else:
+            log.warning("No usable LLM configured; chat uses template replies")
+
+        app.state.memory = None
+        if settings.use_mock_meko:
+            log.warning("USE_MOCK_MEKO is on: memory is in-process and labelled mock (never for the demo)")
+            app.state.memory = MockMemoryProvider()
+        elif is_configured(settings.meko_api_key):
+            app.state.memory = MekoMcpProvider(settings.meko_mcp_url, settings.meko_api_key, settings.meko_datapack)
+        else:
+            log.warning("MEKO_API_KEY is not set; chat memory is off")
         try:
             yield
         finally:
@@ -82,7 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api")
-    for module in (users, geo, roof, weather, solar):
+    for module in (users, geo, roof, weather, solar, assistant):
         app.include_router(module.router, prefix="/api")
     return app
 

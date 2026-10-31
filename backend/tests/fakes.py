@@ -107,6 +107,44 @@ class FakeWeatherProvider:
         return series(date(2026, 11, 1), date(2026, 11, 1) + timedelta(days=days - 1), is_mock=self.is_mock)
 
 
+class FakeLLM:
+    """Scripted LLM. By default it repeats the first fact it is given (numbers stay valid)."""
+
+    is_mock = False
+    model = "fake-llm"
+
+    def __init__(self, replies=None, error=None):
+        self.replies = list(replies or [])
+        self.error = error
+        self.prompts: list[str] = []
+
+    async def generate(self, *, system, prompt, max_output_tokens=700, temperature=0.2):
+        from app.integrations.llm.base import LLMReply
+        self.prompts.append(prompt)
+        if self.error is not None:
+            raise self.error
+        if self.replies:
+            return LLMReply(text=self.replies.pop(0), model=self.model)
+        first_fact = next((line[2:] for line in prompt.splitlines() if line.startswith("- ")), "Nothing yet.")
+        return LLMReply(text=f"Here you go: {first_fact}", model=self.model)
+
+
+class FailingMemory:
+    is_mock = False
+
+    def session(self):
+        from contextlib import asynccontextmanager
+
+        from app.integrations.meko.base import MemoryUnavailable
+
+        @asynccontextmanager
+        async def _session():
+            raise MemoryUnavailable("The memory service is not reachable.")
+            yield  # pragma: no cover
+
+        return _session()
+
+
 class FakeGeocoder:
     is_mock = False
 

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     meko_mcp_url: str = "https://mcp.mekodata.ai/mcp"
     meko_api_key: str = ""
     meko_enabled_default: bool = True
+    meko_datapack: str = "aroha"  # created on first use if missing
 
     llm_provider: str = ""
     llm_api_key: str = ""

@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
+from app.agents.orchestrator.pipeline import Orchestrator
 from app.core.assumptions import Assumptions
 from app.core.errors import AppError
 from app.db.store import DocumentStore, MongoStore
@@ -54,6 +55,13 @@ def get_geo_service(request: Request, assumptions: AssumptionsDep) -> GeoService
 
 def get_roof_service(store: StoreDep, assumptions: AssumptionsDep) -> RoofService:
     return RoofService(store, assumptions)
+
+
+def get_orchestrator(
+    request: Request, store: StoreDep, weather: Annotated[WeatherService, Depends(get_weather_service)]
+) -> Orchestrator:
+    state = request.app.state
+    return Orchestrator(store, weather, state.llm, state.memory)
 
 
 def get_solar_service(
