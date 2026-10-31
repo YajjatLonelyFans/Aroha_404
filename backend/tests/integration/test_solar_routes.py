@@ -26,14 +26,20 @@ def test_default_estimate(api):
         for m in o["monthly_kwh"]:
             assert m["p10"] <= m["median"] <= m["p90"]
         assert o["gross_cost_inr"] == o["capacity_kwp"] * 60000
-        assert o["net_cost_inr"] == o["gross_cost_inr"]  # no subsidy yet
+        assert o["subsidy_inr"] > 0
+        assert o["net_cost_inr"] == o["gross_cost_inr"] - o["subsidy_inr"]
+        assert {b["scheme_id"] for b in o["subsidy_breakdown"]} == {"pm-surya-ghar-cfa", "delhi-capital-subsidy"}
         s, p = o["annual_savings_inr"], o["payback_years"]
         assert s["low"] <= s["likely"] <= s["high"]
         assert p["low"] <= p["likely"] <= p["high"]
+        pi = o["payback_years_with_incentive"]
+        assert pi["low"] <= pi["likely"] <= pi["high"] and pi["likely"] < p["likely"]
         assert o["missing"] == []
 
     assert "not guarantees" in body["disclaimer"]
-    assert any("Subsidies are not applied" in n for n in body["notes"])
+    assert any("only verified, current schemes" in n for n in body["notes"])
+    saved = api.store.data["solar_estimates"][body["estimate_id"]]
+    assert len(saved["policy_record_ids"]) == 3  # central subsidy, Delhi subsidy, Delhi incentive
     assert "Open-Meteo" in body["sources"][0]["note"]
     assert body["estimate_id"] in api.store.data["solar_estimates"]
 

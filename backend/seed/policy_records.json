@@ -1,0 +1,127 @@
+[
+  {
+    "scheme_id": "pm-surya-ghar-cfa",
+    "name": "PM Surya Ghar: Muft Bijli Yojana (central subsidy)",
+    "jurisdiction": "central",
+    "kind": "capital_subsidy",
+    "summary": "Central financial assistance for residential rooftop solar, paid to the homeowner's bank account after commissioning.",
+    "rules": {
+      "eligible_property_types": ["independent_house", "builder_floor"],
+      "requires_roof_rights": true,
+      "discoms": null,
+      "capacity_kwp_max": null,
+      "max_monthly_units_kwh": null,
+      "conditions": [
+        "Apply through the national rooftop solar portal before installation.",
+        "Use a vendor registered on the portal.",
+        "Not already have a central solar subsidy for this connection."
+      ]
+    },
+    "amount_rule": {
+      "type": "tiered_per_kwp",
+      "tiers": [
+        { "up_to_kwp": 2, "inr_per_kwp": 30000 },
+        { "up_to_kwp": 3, "inr_per_kwp": 18000 }
+      ],
+      "cap_inr": 78000
+    },
+    "source_url": "https://eerem.delhi.gov.in/hi/node/12603",
+    "published_on": "2024-03-01",
+    "effective_from": "2024-02-13",
+    "verified_on": "2026-11-01",
+    "verified_by": "Aroha team (AI-assisted reading of the official EEREM Delhi page, last updated 13 Oct 2026); to be confirmed by a team member",
+    "status": "verified",
+    "review_by": "2027-03-31",
+    "notes": "EEREM lists CFA as Rs 30,000 per kW up to 2 kW, Rs 18,000 for capacity above 2 kW up to 3 kW, and Rs 78,000 for 3 kW and above. Official portal: https://pmsuryaghar.gov.in"
+  },
+  {
+    "scheme_id": "delhi-capital-subsidy",
+    "name": "Delhi Solar Energy Policy 2023: state capital subsidy",
+    "jurisdiction": "delhi",
+    "kind": "capital_subsidy",
+    "summary": "Delhi's capital subsidy for residential rooftop solar, passed through the first electricity bill after commissioning.",
+    "rules": {
+      "eligible_property_types": ["independent_house", "builder_floor"],
+      "requires_roof_rights": true,
+      "discoms": ["BRPL", "BYPL", "TPDDL", "NDMC"],
+      "capacity_kwp_max": null,
+      "max_monthly_units_kwh": null,
+      "conditions": [
+        "Share bank details with the DISCOM after the net meter is installed."
+      ]
+    },
+    "amount_rule": {
+      "type": "per_kwp",
+      "inr_per_kwp": 2000,
+      "cap_inr": 10000
+    },
+    "source_url": "https://eerem.delhi.gov.in/hi/node/12603",
+    "published_on": "2024-03-01",
+    "effective_from": "2024-03-01",
+    "verified_on": "2026-11-01",
+    "verified_by": "Aroha team (AI-assisted reading of the official EEREM Delhi page, last updated 13 Oct 2026); to be confirmed by a team member",
+    "status": "verified",
+    "review_by": "2027-03-31",
+    "notes": "Rs 2,000 per kW, up to Rs 10,000 per consumer, residential."
+  },
+  {
+    "scheme_id": "delhi-gbi",
+    "name": "Delhi Solar Energy Policy 2023: generation-based incentive",
+    "jurisdiction": "delhi",
+    "kind": "generation_incentive",
+    "summary": "A monthly payment per unit generated, for 5 years, for residential systems commissioned while the policy is in force.",
+    "rules": {
+      "eligible_property_types": ["independent_house", "builder_floor"],
+      "requires_roof_rights": true,
+      "discoms": ["BRPL", "BYPL", "TPDDL", "NDMC"],
+      "capacity_kwp_max": 10,
+      "max_monthly_units_kwh": null,
+      "conditions": [
+        "The system must be commissioned within the policy's three-year operative period.",
+        "Share bank details with the DISCOM after the net meter is installed."
+      ]
+    },
+    "amount_rule": {
+      "type": "gbi",
+      "tiers": [
+        { "up_to_kwp": 3, "inr_per_kwh": 3 },
+        { "up_to_kwp": 10, "inr_per_kwh": 2 }
+      ],
+      "years": 5
+    },
+    "source_url": "https://eerem.delhi.gov.in/hi/node/12603",
+    "published_on": "2024-03-01",
+    "effective_from": "2024-03-01",
+    "verified_on": "2026-11-01",
+    "verified_by": "Aroha team (AI-assisted reading of the official EEREM Delhi pages, last updated 13 Oct 2026); to be confirmed by a team member",
+    "status": "verified",
+    "review_by": "2027-03-31",
+    "notes": "Rs 3 per kWh up to 3 kW, Rs 2 per kWh above 3 kW up to 10 kW, monthly; valid for five years from commissioning if commissioned within the policy period (https://eerem.delhi.gov.in/hi/node/12632)."
+  },
+  {
+    "scheme_id": "delhi-zero-upfront-3kw-2026",
+    "name": "Delhi zero-upfront 3 kW rooftop scheme (reported, 2026)",
+    "jurisdiction": "delhi",
+    "kind": "programme",
+    "summary": "News reports describe a 2026 amendment offering up to 3 kW at no upfront cost to households using up to 400 units a month.",
+    "rules": {
+      "eligible_property_types": ["independent_house", "builder_floor"],
+      "requires_roof_rights": true,
+      "discoms": ["BRPL", "BYPL", "TPDDL", "NDMC"],
+      "capacity_kwp_max": 3,
+      "max_monthly_units_kwh": 400,
+      "conditions": [
+        "Not already have a solar subsidy under PM Surya Ghar or the Delhi scheme (as reported)."
+      ]
+    },
+    "amount_rule": { "type": "none" },
+    "source_url": "https://newsable.asianetnews.com/india/delhi-solar-energy-policy-2026-government-to-cover-cost-of-3-kw-rooftop-solar-for-eligible-homes-articleshow-mz0gqt1",
+    "published_on": "2026-09-01",
+    "effective_from": null,
+    "verified_on": "2026-11-01",
+    "verified_by": "Aroha team (AI-assisted); NOT found on the official EEREM page as of 1 Nov 2026",
+    "status": "unverified",
+    "review_by": "2026-12-31",
+    "notes": "Reported by news and installer sites only; amounts and terms conflict between reports. Excluded from all money figures until confirmed on an official Delhi government page. LEADS TO CHECK (re-checked 1 Nov 2026): secondary sources say the Cabinet approved the policy's second amendment on 1-2 Sep 2026 and it was notified in the Gazette on 17 Sep 2026 (file DOP-EE/21/2026-EE), and that it may raise the Delhi state subsidy (some reports say Rs 78,000), which would change the delhi-capital-subsidy record too. The EEREM policy page (last updated 13 Oct 2026) still shows the 2023 amounts. A reporting source: https://www.corpseed.com/law-update/delhi-solar-energy-policy-second-amendment-2026"
+  }
+]

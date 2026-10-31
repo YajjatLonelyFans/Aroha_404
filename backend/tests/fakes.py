@@ -40,6 +40,10 @@ class MemoryStore:
         if doc_id in self.data.get(collection, {}):
             self.data[collection][doc_id].update(copy.deepcopy(fields))
 
+    async def find(self, collection, filter):
+        return [{**copy.deepcopy(doc), "id": doc_id} for doc_id, doc in self.data.get(collection, {}).items()
+                if all(doc.get(k) == v for k, v in filter.items())]
+
 
 class FakeWeatherRepo:
     """In-memory stand-in for MongoWeatherRepo."""

@@ -122,6 +122,23 @@ class MekoSession:
         rows = (data or {}).get("results") or []
         return rows[0].get("id") if rows else None
 
+    async def shared_search(self, conversation_id: str, query: str, k: int = 3) -> list[MemoryHit]:
+        data = await self._call("knowledgebase_search", {
+            "query": query, "conversation_id": conversation_id, "datapack_id": await self.datapack_id(), "limit": k,
+        })
+        hits = []
+        for row in (data or {}).get("results", []):
+            meta = row.get("metadata_filters") or {}
+            hits.append(MemoryHit(row["id"], row.get("chunk_text", ""), meta.get("agent_id"), meta,
+                                  row.get("rerank_score")))
+        return hits
+
+    async def promote(self, conversation_id: str, memory_ids: list[str], agent_id: str) -> None:
+        await self._call("memory_promote", {
+            "conversation_id": conversation_id, "memory_ids": memory_ids, "agent_id": agent_id,
+            "datapack_id": await self.datapack_id(),
+        })
+
 
 def _ms(start: float) -> int:
     return round(1000 * (time.perf_counter() - start))

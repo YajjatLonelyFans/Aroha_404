@@ -44,8 +44,11 @@ class AgentContext:
     property: dict[str, Any] | None = None
     assessment: dict[str, Any] | None = None
     estimate: dict[str, Any] | None = None
+    application: dict[str, Any] | None = None
     recalled: list[MemoryHit] = field(default_factory=list)
+    shared_lessons: list[MemoryHit] = field(default_factory=list)
     wants_forecast: bool = False
+    resumed: bool = False  # memory on: saved records may be used
 
 
 def inr(value: float | None) -> str:

@@ -84,6 +84,21 @@ def recommend_size(
     )
 
 
+def payback_with_incentive(
+    net_cost_inr: float, annual_savings_inr: float, annual_incentive_inr: float, incentive_years: int
+) -> float | None:
+    """Simple payback when a yearly incentive is paid on top of savings for a limited number of years."""
+    if net_cost_inr <= 0:
+        return 0.0
+    early = annual_savings_inr + annual_incentive_inr
+    if early > 0 and net_cost_inr <= early * incentive_years:
+        return net_cost_inr / early
+    if annual_savings_inr <= 0:
+        return None
+    remaining = net_cost_inr - max(early, 0) * incentive_years
+    return incentive_years + remaining / annual_savings_inr
+
+
 # --- Tariff and savings ------------------------------------------------------------------
 
 

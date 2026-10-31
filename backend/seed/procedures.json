@@ -1,0 +1,36 @@
+[
+  {
+    "procedure_id": "delhi-rooftop-solar-residential",
+    "name": "Residential rooftop solar in Delhi (PM Surya Ghar route)",
+    "discoms": ["BRPL", "BYPL", "TPDDL", "NDMC"],
+    "source_url": "https://eerem.delhi.gov.in/hi/node/12632",
+    "verified_on": "2026-11-01",
+    "verified_by": "Aroha team (AI-assisted reading of the official EEREM Delhi page, last updated 13 Oct 2026); to be confirmed by a team member",
+    "steps": [
+      { "id": "register", "stage": "planning", "actor": "homeowner", "title": "Register on the national rooftop solar portal (pmsuryaghar.gov.in)." },
+      { "id": "apply", "stage": "applied", "actor": "homeowner", "title": "Log in and submit the rooftop solar application." },
+      { "id": "feasibility", "stage": "applied", "actor": "discom", "title": "The DISCOM checks technical feasibility and emails its approval." },
+      { "id": "vendor", "stage": "applied", "actor": "homeowner", "title": "Hire a registered vendor to install the system; share the system details with the DISCOM." },
+      { "id": "install_docs", "stage": "inspection", "actor": "homeowner", "title": "After installation, submit the documents to the DISCOM and the national portal." },
+      { "id": "inspection", "stage": "inspection", "actor": "discom", "title": "The DISCOM inspects the plant and approves it if it meets the technical standards." },
+      { "id": "net_meter", "stage": "inspection", "actor": "discom", "title": "The DISCOM installs the net meter and solar meter; the system can then be switched on." },
+      { "id": "commissioning", "stage": "commissioned", "actor": "discom", "title": "The DISCOM updates the meter details on the portal, which issues the commissioning certificate." },
+      { "id": "central_subsidy", "stage": "commissioned", "actor": "homeowner", "title": "Submit bank details and a cancelled cheque on the portal for the central subsidy (paid within 30 days of verification)." },
+      { "id": "state_subsidy", "stage": "commissioned", "actor": "homeowner", "title": "Share bank details with the DISCOM for the Delhi capital subsidy and generation incentive (credited from the first bill after the net meter)." }
+    ],
+    "documents": [
+      { "type": "electricity_bill", "label": "Latest electricity bill (shows your CA / consumer number)", "required": true, "verified": false, "source_url": "https://bridgewaypower.in/blog/net-metering-delhi-2026-how-to-apply" },
+      { "type": "id_proof", "label": "Aadhaar or other ID", "required": true, "verified": false, "source_url": "https://bridgewaypower.in/blog/net-metering-delhi-2026-how-to-apply" },
+      { "type": "ownership_proof", "label": "Proof of ownership or permission to use the roof", "required": true, "verified": false, "source_url": "https://www.heavengreenenergy.com/blog/pm-suryaghar-bses-delhi" },
+      { "type": "bank_details", "label": "Bank account details and a cancelled cheque", "required": true, "verified": true, "source_url": "https://eerem.delhi.gov.in/hi/node/12632" },
+      { "type": "roof_photos", "label": "Photos of the roof", "required": false, "verified": false, "source_url": "https://www.heavengreenenergy.com/blog/pm-suryaghar-bses-delhi" }
+    ],
+    "lessons": [
+      {
+        "text": "Delhi rooftop solar: the state capital subsidy and the generation-based incentive are paid by the DISCOM against the first electricity bill after the net meter is installed, so share bank details with the DISCOM (source: EEREM Delhi, https://eerem.delhi.gov.in/hi/node/12632, checked 1 Nov 2026).",
+        "source_url": "https://eerem.delhi.gov.in/hi/node/12632",
+        "verified_on": "2026-11-01"
+      }
+    ]
+  }
+]

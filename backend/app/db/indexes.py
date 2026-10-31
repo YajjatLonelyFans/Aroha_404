@@ -49,8 +49,11 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("scheme_id", ASCENDING), ("verified_on", DESCENDING)], name="scheme_latest"),
         IndexModel([("status", ASCENDING)], name="status"),
     ],
+    c.PROCEDURES: [
+        IndexModel([("procedure_id", ASCENDING)], name="procedure_id", unique=True),
+    ],
     c.APPLICATIONS: [
-        IndexModel([("user_id", ASCENDING)], name="user_id"),
+        IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_latest"),
     ],
     c.AGENT_LOGS: [
         IndexModel([("run_id", ASCENDING)], name="run_id"),

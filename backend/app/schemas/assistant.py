@@ -16,6 +16,7 @@ class MemoryInfo(BaseModel):
     live: bool  # a real Meko call succeeded this turn
     is_mock: bool
     recalled: int
+    shared: int = 0  # promoted lessons from the shared knowledge base
     written: int  # memories queued for saving after the reply
     error: str | None = None
 

@@ -53,6 +53,14 @@ class MemorySession(Protocol):
         self, conversation_id: str, agent_id: str, text: str, metadata: dict[str, Any]
     ) -> str | None: ...
 
+    async def shared_search(self, conversation_id: str, query: str, k: int = 3) -> list[MemoryHit]:
+        """Promoted, de-identified lessons in the datapack's shared knowledge base (any user can read)."""
+        ...
+
+    async def promote(self, conversation_id: str, memory_ids: list[str], agent_id: str) -> None:
+        """Move memories into the shared knowledge base. One-way."""
+        ...
+
 
 class MemoryProvider(Protocol):
     is_mock: bool

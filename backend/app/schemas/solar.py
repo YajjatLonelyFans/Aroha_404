@@ -30,6 +30,12 @@ class Range(BaseModel):
     high: float | None
 
 
+class SubsidyLine(BaseModel):
+    scheme_id: str
+    name: str
+    amount_inr: float
+
+
 class EstimateOption(BaseModel):
     capacity_kwp: float
     panel_count: int
@@ -38,9 +44,14 @@ class EstimateOption(BaseModel):
     annual_kwh: Band
     gross_cost_inr: float | None
     subsidy_inr: float
+    subsidy_breakdown: list[SubsidyLine]
     net_cost_inr: float | None
     annual_savings_inr: Range
     payback_years: Range
+    # Generation-based incentive, paid per unit generated for a limited number of years.
+    annual_incentive_inr: Range | None
+    incentive_years: int | None
+    payback_years_with_incentive: Range | None
     missing: list[str]
 
 

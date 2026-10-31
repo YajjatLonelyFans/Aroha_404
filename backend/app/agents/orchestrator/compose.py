@@ -11,6 +11,7 @@ Copy every number exactly as written there: same digits, same rounding, same uni
 Never calculate, round, convert, estimate or invent a number.
 Say "estimate", "about" or "range"; never say "guaranteed", "approved" or "you will save".
 If the facts do not answer the question, say what is missing and which step of the app provides it.
+If the facts include a "Verified tip shared by Aroha" that is relevant, pass it on in one sentence.
 Never mention coordinates, addresses, phone numbers or ID numbers."""
 
 STRICT_RETRY = (

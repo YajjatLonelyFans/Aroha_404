@@ -14,18 +14,20 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
 
-from app.agents import financial, roof, weather
+from app.agents import application, financial, policy, roof, weather
 from app.agents.contracts import AgentContext, AgentName, AgentOutput, MemoryCandidate
 from app.agents.orchestrator.compose import STRICT_RETRY, SYSTEM_PROMPT, build_prompt, template_reply
 from app.agents.orchestrator.privacy import privacy_problem
 from app.agents.orchestrator.reply_validator import unknown_numbers
-from app.agents.orchestrator.routing import RECALL_TOPICS, plan, wants_forecast
+from app.agents.orchestrator.routing import RECALL_TOPICS, SHARED_TOPIC, plan, wants_forecast
 from app.core.errors import AppError, NotFoundError
 from app.db import collections as c
 from app.db.store import DocumentStore
 from app.integrations.llm.base import LLMProvider, LLMRateLimited, LLMUnavailable
 from app.integrations.meko.base import MemoryHit, MemoryProvider, MemoryUnavailable, agent_key
 from app.schemas.assistant import ChatRequest, ChatResponse, LLMInfo, MemoryInfo
+from app.services.application_service import ApplicationService
+from app.services.policy_service import PolicyService
 from app.services.weather_service import WeatherService, utc_now
 
 log = logging.getLogger(__name__)
@@ -40,10 +42,14 @@ class Orchestrator:
         weather: WeatherService,
         llm: LLMProvider | None,
         memory: MemoryProvider | None,
+        policy: PolicyService,
+        applications: ApplicationService,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self._store = store
         self._weather = weather
+        self._policy = policy
+        self._applications = applications
         self._llm = llm
         self._memory = memory
         self._clock = clock
@@ -61,6 +67,7 @@ class Orchestrator:
                          is_mock=bool(self._memory and self._memory.is_mock), recalled=0, written=0)
         meko_calls: list[dict[str, Any]] = []
         recalled: list[MemoryHit] = []
+        shared: list[MemoryHit] = []
         conversation_id: str | None = None
 
         # 1. Recall (Memory ON only).
@@ -76,29 +83,38 @@ class Orchestrator:
                         if conversation_id != user.get("meko_conversation_id"):
                             await self._store.update(c.USERS, req.user_id, {"meko_conversation_id": conversation_id})
                         queries = {agent_key(a): f"{req.message} ({RECALL_TOPICS[a]})" for a in agents}
-                        recalled = await ms.search(conversation_id, queries, k=3)
+                        if {"policy", "application"} & set(agents):
+                            # Promoted lessons from the shared knowledge base, searched alongside recall.
+                            recalled, shared = await asyncio.gather(
+                                ms.search(conversation_id, queries, k=3),
+                                self._shared_lessons(ms, conversation_id, f"{req.message} ({SHARED_TOPIC})"),
+                            )
+                        else:
+                            recalled = await ms.search(conversation_id, queries, k=3)
                     finally:
                         meko_calls += [call.__dict__ for call in ms.calls]
                 mem.live = any(call["ok"] for call in meko_calls) and not self._memory.is_mock
-                mem.recalled = len(recalled)
+                mem.recalled, mem.shared = len(recalled), len(shared)
             except MemoryUnavailable as exc:
                 use_memory, mem.error = False, exc.message
                 notes.append("Memory is unavailable right now, so this chat starts fresh.")
 
         # 2. Context: saved records are only used when memory is on (resume).
         ctx = AgentContext(user_id=req.user_id, message=req.message, user=user,
-                           wants_forecast=wants_forecast(req.message))
+                           wants_forecast=wants_forecast(req.message), resumed=use_memory)
         if use_memory:
             ctx.property = await self._store.latest(c.PROPERTIES, {"user_id": req.user_id})
             ctx.assessment = await self._store.latest(c.ROOF_ASSESSMENTS, {"user_id": req.user_id})
             ctx.estimate = await self._store.latest(c.SOLAR_ESTIMATES, {"user_id": req.user_id})
+            ctx.application = await self._store.latest(c.APPLICATIONS, {"user_id": req.user_id})
             ctx.recalled = recalled
+            ctx.shared_lessons = shared
 
         # 3. Run the chosen agents in parallel.
         outputs = await asyncio.gather(*[self._run_agent(a, ctx) for a in agents])
 
         # 4-5. Compose with one LLM call, validate numbers, fall back to the template.
-        sources = [f for o in outputs for f in o.facts] + [m.text for m in recalled] + [req.message]
+        sources = [f for o in outputs for f in o.facts] + [m.text for m in recalled + shared] + [req.message]
         reply, llm_info = await self._compose(req.message, outputs, recalled, sources, fresh=not use_memory)
 
         # 6. Log the run; memory writes happen after the reply is sent.
@@ -130,12 +146,23 @@ class Orchestrator:
                 return await roof.run(ctx)
             if agent == "weather":
                 return await weather.run(ctx, self._weather)
+            if agent == "policy":
+                return await policy.run(ctx, self._policy)
+            if agent == "application":
+                return await application.run(ctx, self._applications)
             return await financial.run(ctx)
         except AppError as exc:
             return AgentOutput(agent=agent, status="error", error=exc.message)
         except Exception:  # one failing agent must not break the turn
             log.exception("Agent %s failed", agent)
             return AgentOutput(agent=agent, status="error", error="Unexpected error.")
+
+    @staticmethod
+    async def _shared_lessons(ms, conversation_id: str, query: str) -> list[MemoryHit]:
+        try:
+            return await ms.shared_search(conversation_id, query, k=2)
+        except MemoryUnavailable:
+            return []  # tips are optional; recall still counts
 
     async def _compose(
         self, message: str, outputs: list[AgentOutput], recalled: list[MemoryHit], sources: list[str], fresh: bool

@@ -16,6 +16,7 @@ class DocumentStore(Protocol):
     async def get(self, collection: str, doc_id: str) -> dict[str, Any] | None: ...
     async def latest(self, collection: str, filter: dict[str, Any]) -> dict[str, Any] | None: ...
     async def update(self, collection: str, doc_id: str, fields: dict[str, Any]) -> None: ...
+    async def find(self, collection: str, filter: dict[str, Any]) -> list[dict[str, Any]]: ...
 
 
 def _oid(doc_id: str) -> ObjectId | None:
@@ -53,3 +54,6 @@ class MongoStore:
         oid = _oid(doc_id)
         if oid is not None:
             await self._db[collection].update_one({"_id": oid}, {"$set": fields})
+
+    async def find(self, collection: str, filter: dict[str, Any]) -> list[dict[str, Any]]:
+        return [_out(doc) async for doc in self._db[collection].find(filter)]

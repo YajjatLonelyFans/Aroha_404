@@ -50,14 +50,16 @@ def test_numbers_from_the_question_are_allowed():
     ("How much will I save and what is the payback?", ["financial"]),
     ("How many panels fit on my roof?", ["roof"]),
     ("Is 3 kW enough and what does it cost?", ["roof", "financial"]),
-    ("Hi, where was I?", ["roof", "weather", "financial"]),
+    ("Hi, where was I?", ["roof", "weather", "financial", "policy", "application"]),
+    ("Am I eligible for the subsidy?", ["financial", "policy"]),
+    ("Which documents do I need to apply?", ["application"]),
 ])
 def test_plan(message, expected):
     assert plan(message) == expected
 
 
 def test_short_keywords_match_whole_words_only():
-    assert plan("Tell me about the cursor") == ["roof", "weather", "financial"]  # "rs" inside a word
+    assert plan("Tell me about the cursor") == ["roof", "weather", "financial", "policy", "application"]  # "rs" inside a word
     assert "financial" in plan("Is it worth 2 lakh rs?")
 
 

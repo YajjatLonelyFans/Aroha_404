@@ -12,7 +12,7 @@ from app.core.errors import AppError, NotFoundError
 from app.db import collections as c
 from app.db.store import DocumentStore
 from app.domain.errors import DomainError
-from app.domain.finance import Slab, estimate_finance, recommend_size
+from app.domain.finance import Slab, estimate_finance, payback_with_incentive, recommend_size
 from app.domain.generation import SpecificYield, median_annual_yield, monthly_generation
 from app.domain.units import round_inr, round_kwh, round_kwp, round_pct, round_years
 from app.schemas.common import Source
@@ -23,7 +23,9 @@ from app.schemas.solar import (
     Range,
     SolarEstimateRequest,
     SolarEstimateResponse,
+    SubsidyLine,
 )
+from app.services.policy_service import PolicyService
 from app.services.weather_service import (
     ATTRIBUTION,
     WeatherService,
@@ -31,7 +33,7 @@ from app.services.weather_service import (
     utc_now,
 )
 
-MODEL_VERSION = "gen-1.0.0"
+MODEL_VERSION = "gen-1.1.0"  # 1.1: verified subsidies and generation incentive
 NEIGHBOUR_STEP_KWP = 1.0  # default options: recommended size and about 1 kW either side
 DISCLAIMER = (
     "These are estimates, not guarantees. Generation is a range based on past weather; "
@@ -70,10 +72,12 @@ class SolarService:
         store: DocumentStore,
         weather: WeatherService,
         assumptions: Assumptions,
+        policy: PolicyService,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self._store = store
         self._weather = weather
+        self._policy = policy
         self._a = assumptions
         self._clock = clock
 
@@ -130,21 +134,36 @@ class SolarService:
             notes.append(
                 f"Savings need the {user['discom']} tariff, but the assumptions file has {a.tariff.discom} only."
             )
-        notes.append("Subsidies are not applied yet; verified scheme records come in a later step.")
-
         options: list[EstimateOption] = []
+        record_ids: set[str] = set()
         for n in counts:
             kwp = n * module_wp / 1000
             gen = monthly_generation(kwp, sy)
+            # Only verified, current, eligible scheme records reach the money figures.
+            policy = await self._policy.money_for(user, kwp)
+            record_ids.update(policy.record_ids)
             fin = estimate_finance(
                 capacity_kwp=kwp,
                 monthly_kwh=gen.monthly_kwh,
                 monthly_consumption_kwh=monthly_units,
                 cost_per_kwp_inr=a.costs.cost_per_kwp_inr,
-                subsidy_inr=0.0,
+                subsidy_inr=policy.subsidy_inr,
                 slabs=slabs,
                 export_rate_inr=a.tariff.export_rate_inr,
             )
+            incentive = payback_inc = None
+            if policy.inr_per_kwh is not None and gen.annual_kwh.median is not None:
+                bands = {"low": gen.annual_kwh.p10, "likely": gen.annual_kwh.median, "high": gen.annual_kwh.p90}
+                incentive = Range(**{k: round_inr(v * policy.inr_per_kwh) for k, v in bands.items()})
+                if fin.net_cost_inr is not None and fin.annual_savings_inr.likely is not None:
+                    # More generation → more savings and incentive → shorter payback, so the range flips.
+                    pairs = {"low": "high", "likely": "likely", "high": "low"}
+                    payback_inc = Range(**{
+                        k: _r(payback_with_incentive(fin.net_cost_inr, getattr(fin.annual_savings_inr, src),
+                                                     bands[src] * policy.inr_per_kwh, policy.incentive_years),
+                              round_years)
+                        for k, src in pairs.items()
+                    })
             options.append(EstimateOption(
                 capacity_kwp=round_kwp(kwp),
                 panel_count=n,
@@ -158,20 +177,30 @@ class SolarService:
                                 p90=_r(gen.annual_kwh.p90, round_kwh)),
                 gross_cost_inr=_r(fin.gross_cost_inr, round_inr),
                 subsidy_inr=round_inr(fin.subsidy_inr),
+                subsidy_breakdown=[SubsidyLine(**line) for line in policy.breakdown],
                 net_cost_inr=_r(fin.net_cost_inr, round_inr),
                 annual_savings_inr=Range(**{k: _r(getattr(fin.annual_savings_inr, k), round_inr)
                                             for k in ("low", "likely", "high")}),
                 payback_years=Range(**{k: _r(getattr(fin.payback_years, k), round_years)
                                        for k in ("low", "likely", "high")}),
+                annual_incentive_inr=incentive,
+                incentive_years=policy.incentive_years if incentive else None,
+                payback_years_with_incentive=payback_inc,
                 missing=fin.missing,
             ))
+        if record_ids:
+            notes.append("Subsidy counts only verified, current schemes you are eligible for; "
+                         "schemes that still need verification are left out.")
+        else:
+            notes.append("No verified subsidy applies, so costs are shown without subsidy.")
 
         assumptions = [
             f"Energy per kWp from {clim['period']} hourly weather history for this spot; "
             f"shade lowers it by {round_pct(100 * shade):g}%.",
             f"Losses other than heat and shade: {round_pct(100 * a.losses.l_other_fraction):g}%.",
             f"Same use every month: {monthly_units:g} units.",
-            "Simple payback: no panel ageing, tariff rises or loan cost.",
+            "Simple payback: no panel ageing, tariff rises or loan cost. "
+            "'With incentive' adds the generation incentive for the years it is paid.",
         ]
         if a.costs.cost_per_kwp_inr is not None:
             assumptions.append(f"Installed cost {a.costs.cost_per_kwp_inr:,.0f} INR per kWp (as of {a.costs.as_of}).")
@@ -210,7 +239,7 @@ class SolarService:
             **response_fields,
             "user_id": req.user_id,
             "property_id": assessment["property_id"],
-            "policy_record_ids": [],
+            "policy_record_ids": sorted(record_ids),
             "assumptions_snapshot": snapshot,
             "created_at": self._clock(),
         })

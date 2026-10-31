@@ -12,6 +12,9 @@ KEYWORDS: dict[AgentName, tuple[str, ...]] = {
                 "generat", "produce", "output", "kwh"),
     "financial": ("cost", "price", "save", "saving", "payback", "money", "bill", "rupee", "₹", "rs", "inr",
                   "afford", "worth", "subsidy", "loan", "emi", "recommend", "budget", "invest", "return"),
+    "policy": ("subsid", "scheme", "eligib", "surya ghar", "government", "incentive", "gbi", "yojana", "qualify"),
+    "application": ("apply", "applic", "document", "paper", "step", "next", "net meter", "discom", "process",
+                    "register", "portal", "vendor", "inspect", "bank", "approval", "commission"),
 }
 # Added to the homeowner's message when recalling each agent's memories, so greetings
 # like "where was I?" still match the stored summaries.
@@ -19,9 +22,12 @@ RECALL_TOPICS: dict[AgentName, str] = {
     "roof": "roof assessment usable area panels kW shade",
     "weather": "weather yearly output per kW sunniest month seasons",
     "financial": "estimate recommended size cost savings payback",
+    "policy": "subsidy schemes eligible amounts",
+    "application": "application progress steps documents pending",
 }
+SHARED_TOPIC = "Delhi rooftop solar subsidy application procedure DISCOM"
 FORECAST_WORDS = ("forecast", "this week", "next week", "today", "tomorrow", "next few days", "coming days")
-ALL_AGENTS: tuple[AgentName, ...] = ("roof", "weather", "financial")
+ALL_AGENTS: tuple[AgentName, ...] = ("roof", "weather", "financial", "policy", "application")
 
 
 def _has(text: str, word: str) -> bool:

@@ -10,13 +10,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import PyMongoError
 
 from app import __version__
-from app.api.routes import assistant, geo, health, roof, solar, users, weather
+from app.api.routes import applications, assistant, geo, health, policy, roof, solar, users, weather
 from app.core.assumptions import load_assumptions
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
 from app.core.settings import Settings, get_settings, is_configured
 from app.db.client import create_client
 from app.db.indexes import ensure_indexes
+from app.db.seed import load_policy_records, load_procedures, seed_database
 from app.integrations.geocoding.base import UnconfiguredGeocoder
 from app.integrations.geocoding.mock import MockGeocoder
 from app.integrations.geocoding.nominatim import NominatimGeocoder
@@ -43,13 +44,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if missing:
             log.warning("assumptions.v1.json has %d unset value(s): %s", len(missing), missing)
 
+        # A malformed seed file stops startup, like the assumptions file.
+        load_policy_records()
+        load_procedures()
+
         app.state.mongo = create_client(settings)
         if app.state.mongo is not None:
             try:
                 await ensure_indexes(app.state.mongo[settings.mongodb_db])
+                await seed_database(app.state.mongo[settings.mongodb_db])
             except PyMongoError as exc:
                 # Keep serving so /api/health can report the problem.
-                log.error("Could not create MongoDB indexes: %s", exc)
+                log.error("Could not prepare MongoDB (indexes, seed records): %s", exc)
 
         app.state.http = httpx.AsyncClient()
         if settings.use_mock_weather:
@@ -106,7 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api")
-    for module in (users, geo, roof, weather, solar, assistant):
+    for module in (users, geo, roof, weather, solar, policy, applications, assistant):
         app.include_router(module.router, prefix="/api")
     return app
 

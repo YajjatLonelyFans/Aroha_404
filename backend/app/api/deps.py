@@ -9,7 +9,9 @@ from app.core.assumptions import Assumptions
 from app.core.errors import AppError
 from app.db.store import DocumentStore, MongoStore
 from app.db.weather_repo import MongoWeatherRepo, NoCacheWeatherRepo, WeatherRepo
+from app.services.application_service import ApplicationService
 from app.services.geo_service import GeoService
+from app.services.policy_service import PolicyService
 from app.services.roof_service import RoofService
 from app.services.solar_service import SolarService
 from app.services.user_service import UserService
@@ -61,10 +63,21 @@ def get_orchestrator(
     request: Request, store: StoreDep, weather: Annotated[WeatherService, Depends(get_weather_service)]
 ) -> Orchestrator:
     state = request.app.state
-    return Orchestrator(store, weather, state.llm, state.memory)
+    return Orchestrator(store, weather, state.llm, state.memory, PolicyService(store), ApplicationService(store))
+
+
+def get_policy_service(store: StoreDep) -> PolicyService:
+    return PolicyService(store)
+
+
+def get_application_service(store: StoreDep) -> ApplicationService:
+    return ApplicationService(store)
 
 
 def get_solar_service(
-    store: StoreDep, assumptions: AssumptionsDep, weather: Annotated[WeatherService, Depends(get_weather_service)]
+    store: StoreDep,
+    assumptions: AssumptionsDep,
+    weather: Annotated[WeatherService, Depends(get_weather_service)],
+    policy: Annotated[PolicyService, Depends(get_policy_service)],
 ) -> SolarService:
-    return SolarService(store, weather, assumptions)
+    return SolarService(store, weather, assumptions, policy)

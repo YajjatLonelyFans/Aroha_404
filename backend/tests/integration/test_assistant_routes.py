@@ -23,7 +23,8 @@ def test_memory_off_starts_fresh_and_asks_again(api):
     user_id = ready_user(api)
     body = chat(api, user_id, "Hi, where was I?", meko=False)
     assert "don't have your home's details" in body["reply"]
-    assert body["memory"] == {"enabled": False, "live": False, "is_mock": True, "recalled": 0, "written": 0, "error": None}
+    assert body["memory"] == {"enabled": False, "live": False, "is_mock": True, "recalled": 0, "shared": 0,
+                              "written": 0, "error": None}
     assert body["llm"]["fallback_reason"] == "no_facts"
     assert api.llm.prompts == []  # no quota spent when there is nothing to explain
     assert api.memory.rows == []
@@ -32,14 +33,14 @@ def test_memory_off_starts_fresh_and_asks_again(api):
 def test_memory_on_resumes_and_saves_summaries(api):
     user_id = ready_user(api)
     body = chat(api, user_id, "Hi, where was I?")
-    assert body["agents"] == ["roof", "weather", "financial"]
+    assert body["agents"] == ["roof", "weather", "financial", "policy", "application"]
     assert all(o["status"] == "ok" for o in body["agent_outputs"])
     assert body["llm"]["used"] is True and body["llm"]["fallback_reason"] is None
-    assert body["memory"]["written"] == 3
+    assert body["memory"]["written"] == 4  # the application agent saves once an application exists
 
     # Saved after the reply, one per agent, scoped to this user's conversation.
     saved = {hit.agent_id for _, hit in api.memory.rows}
-    assert saved == {"aroha:roof", "aroha:weather", "aroha:financial"}
+    assert saved == {"aroha:roof", "aroha:weather", "aroha:financial", "aroha:policy"}
     assert api.store.data["users"][user_id]["meko_conversation_id"] == f"mock-conv-{user_id}"
 
 
@@ -47,17 +48,17 @@ def test_second_visit_recalls_and_does_not_duplicate(api):
     user_id = ready_user(api)
     chat(api, user_id, "Hi, where was I?")
     body = chat(api, user_id, "Hi again, where was I?")
-    assert body["memory"]["recalled"] == 3
+    assert body["memory"]["recalled"] == 4
     assert body["memory"]["written"] == 0
     assert "What Aroha remembers" in api.llm.prompts[-1]
-    assert len(api.memory.rows) == 3
+    assert len(api.memory.rows) == 4
 
 
 def test_no_duplicates_even_when_recall_misses(api):
     # Live Meko drops weak matches, so a greeting can recall nothing; saves must still not repeat.
     user_id = ready_user(api)
     chat(api, user_id, "Hi, where was I?")
-    assert len(api.store.data["users"][user_id]["meko_saved"]) == 3
+    assert len(api.store.data["users"][user_id]["meko_saved"]) == 4
     stored = list(api.memory.rows)
     api.memory.rows.clear()  # simulate a search that finds nothing
     body = chat(api, user_id, "Hello?")
@@ -90,7 +91,7 @@ def test_recall_query_adds_each_agents_topic(api):
 
     api.memory.session = spying_session
     chat(api, user_id, "Hi, where was I?")
-    assert set(seen) == {"aroha:roof", "aroha:weather", "aroha:financial"}
+    assert set(seen) == {"aroha:roof", "aroha:weather", "aroha:financial", "aroha:policy", "aroha:application"}
     assert "usable area" in seen["aroha:roof"] and "payback" in seen["aroha:financial"]
 
 
@@ -162,16 +163,17 @@ def test_run_is_logged_with_memory_calls(api):
     logs = [d for d in api.store.data["agent_logs"].values() if d["run_id"] == body["run_id"]]
     assert len(logs) == 1
     log = logs[0]
-    assert log["agents"] == ["roof", "weather", "financial"]
-    assert [c["tool"] for c in log["meko"]["calls"]] == ["mock.conversation_create", "mock.memory_search"]
-    assert [c["tool"] for c in log["meko_commit_calls"]] == ["mock.memory_add"] * 3
+    assert log["agents"] == ["roof", "weather", "financial", "policy", "application"]
+    assert sorted(c["tool"] for c in log["meko"]["calls"]) == [
+        "mock.conversation_create", "mock.knowledgebase_search", "mock.memory_search"]
+    assert [c["tool"] for c in log["meko_commit_calls"]] == ["mock.memory_add"] * 4
     assert log["llm"]["model"] == "fake-llm"
 
 
 def test_memories_that_mention_the_name_are_not_saved(api):
     user_id = ready_user(api, display_name="panels")  # the roof summary mentions "panels"
     body = chat(api, user_id, "Hi, where was I?")
-    assert body["memory"]["written"] == 2
+    assert body["memory"]["written"] == 3
     assert "aroha:roof" not in {hit.agent_id for _, hit in api.memory.rows}
 
 
