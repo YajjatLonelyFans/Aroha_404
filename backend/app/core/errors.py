@@ -34,6 +34,11 @@ class AppError(Exception):
         self.details = details
 
 
+class NotFoundError(AppError):
+    def __init__(self, what: str) -> None:
+        super().__init__("not_found", f"{what} not found.", status_code=404)
+
+
 def error_body(code: str, message: str, retryable: bool = False, details: Any = None) -> dict:
     body: dict[str, Any] = {"code": code, "message": message, "retryable": retryable}
     if details is not None:

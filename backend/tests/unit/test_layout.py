@@ -12,6 +12,8 @@ from app.domain.layout import (
     assess_capacity,
     pack_panels,
     panels_to_geojson,
+    row_gap,
+    winter_noon_sun_elevation_deg,
 )
 from tests.unit.helpers import ORIGIN_X, ORIGIN_Y, metric_rect
 
@@ -41,6 +43,43 @@ def test_row_gap_sits_between_rows():
     layout = pack_panels(metric_rect(10, 5), MODULE, replace(FLAT, row_gap_m=1))
     assert layout.panel_count == 20
     assert layout.orientation == "portrait"
+
+
+def test_winter_noon_sun_in_delhi():
+    assert winter_noon_sun_elevation_deg(28.6) == pytest.approx(37.96)
+
+
+def test_shade_spacing_depends_on_orientation():
+    # Module 2 x 1 m at 30°: raised edge 1.0 m (portrait) or 0.5 m (landscape); sun at 45° → equal shadow.
+    p = LayoutParams(tilt_deg=30, azimuth_deg=0, row_gap_m=0.0, shade_free_sun_elevation_deg=45)
+    assert row_gap(MODULE, "portrait", p) == pytest.approx(1.0)
+    assert row_gap(MODULE, "landscape", p) == pytest.approx(0.5)
+
+
+def test_minimum_gap_wins_when_shadow_is_shorter():
+    p = LayoutParams(tilt_deg=30, azimuth_deg=0, row_gap_m=0.8, shade_free_sun_elevation_deg=45)
+    assert row_gap(MODULE, "landscape", p) == 0.8
+    assert row_gap(MODULE, "portrait", p) == pytest.approx(1.0)
+
+
+def test_flat_panels_need_no_shade_spacing():
+    p = LayoutParams(tilt_deg=0, azimuth_deg=0, row_gap_m=0.2, shade_free_sun_elevation_deg=45)
+    assert row_gap(MODULE, "portrait", p) == 0.2
+
+
+def test_shade_spacing_is_used_in_packing():
+    # 10 x 5 m, tilt 30°, sun 45°:
+    # portrait: depth 1.73 + gap 1.0 → rows at 0, 2.73 (ends 4.46) → 2 rows x 10 = 20
+    # landscape: depth 0.87 + gap 0.5 → rows at 0, 1.37, 2.73, 4.10 (ends 4.97) → 4 rows x 5 = 20
+    p = LayoutParams(tilt_deg=30, azimuth_deg=0, row_gap_m=0.0, shade_free_sun_elevation_deg=45)
+    layout = pack_panels(metric_rect(10, 5), MODULE, p)
+    assert layout.panel_count == 20
+    assert layout.orientation == "portrait" and layout.row_gap_m == pytest.approx(1.0)
+
+
+def test_bad_sun_elevation_rejected():
+    with pytest.raises(DomainError):
+        row_gap(MODULE, "portrait", LayoutParams(20, 0, 0.0, shade_free_sun_elevation_deg=0))
 
 
 def test_east_facing_rotates_rows():

@@ -60,6 +60,20 @@ YIELD_READY = {
     "module": {"gamma_per_c": -0.004, "noct_c": 45},
     "losses": {"l_other_fraction": 0.14},
 }
+# Every value Stage 4 needs. Illustrative numbers for tests only, not real Delhi figures.
+JOURNEY_READY = {
+    "module": {"length_m": 2.0, "width_m": 1.0, "wp": 500, "gamma_per_c": -0.004, "noct_c": 45},
+    "layout": {"edge_setback_m": 0.5, "no_go_clearance_m": 0.0, "row_gap_m": 0.5, "flush_gap_m": 0.05,
+               "default_flat_tilt_deg": 20, "default_azimuth_deg": 0},
+    "capacity": {"shading_haircut_fraction": 0.25, "small_area_m2": 10, "many_obstructions_fraction": 0.3},
+    "losses": {"l_other_fraction": 0.14, "shading_by_level": {"none": 0.0, "partial": 0.05, "heavy": 0.15},
+               "shading_cap_fraction": 0.25},
+    "costs": {"cost_per_kwp_inr": 60000},
+    "tariff": {"discom": "BRPL", "export_rate_inr": 3.0,
+               "slabs": [{"up_to_kwh": 200, "rate_inr_per_kwh": 3.0}, {"up_to_kwh": 400, "rate_inr_per_kwh": 4.5},
+                         {"up_to_kwh": None, "rate_inr_per_kwh": 6.5}]},
+    "validation": {"min_outline_m2": 10, "max_outline_m2": 2000},
+}
 OUTLOOK_READY = {"forecast": {"sunny_min_ratio": 0.9, "cloudy_max_ratio": 0.5, "rain_min_mm": 5}}
 
 

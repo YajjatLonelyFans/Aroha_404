@@ -15,7 +15,6 @@ import numpy as np
 from app.core.assumptions import AssumptionMissingError, Assumptions
 from app.core.errors import AppError
 from app.db.weather_repo import WeatherRepo
-from app.domain.errors import DomainError
 from app.domain.generation import (
     GenerationParams,
     Percentiles,
@@ -24,6 +23,7 @@ from app.domain.generation import (
     monthly_generation,
     specific_yield,
 )
+from app.domain.geometry import check_point_in_bbox
 from app.domain.seasons import MonthClimate, season_notes
 from app.domain.weather import (
     ForecastDay,
@@ -129,9 +129,7 @@ class WeatherService:
     # --- helpers -------------------------------------------------------------------------
 
     def _check_location(self, lat: float, lon: float) -> None:
-        min_lon, min_lat, max_lon, max_lat = self._a.validation.delhi_bbox
-        if not (min_lat <= lat <= max_lat and min_lon <= lon <= max_lon):
-            raise DomainError("outside_delhi", "The location must be inside Delhi.")
+        check_point_in_bbox(lat, lon, self._a.validation.delhi_bbox)
 
     def _yield_params(self) -> dict[str, Any] | None:
         """Module and loss values needed for specific yield, or None until they are filled in."""

@@ -34,11 +34,22 @@ class ModuleSpec:
     wp: float
 
 
+EARTH_AXIAL_TILT_DEG = 23.44
+
+
+def winter_noon_sun_elevation_deg(lat: float) -> float:
+    """Sun height at solar noon on the December solstice (northern hemisphere)."""
+    return 90.0 - lat - EARTH_AXIAL_TILT_DEG
+
+
 @dataclass(frozen=True)
 class LayoutParams:
     tilt_deg: float
     azimuth_deg: float
-    row_gap_m: float  # behind each row: inter-row gap (flat) or flush gap (sloped)
+    row_gap_m: float  # minimum gap behind each row (flat), or the flush gap (sloped)
+    # When set, tilted rows are spaced so they do not shade each other with the
+    # sun at this height; the gap then depends on panel orientation.
+    shade_free_sun_elevation_deg: float | None = None
 
 
 @dataclass(frozen=True)
@@ -47,6 +58,7 @@ class PanelLayout:
     capacity_kwp: float
     orientation: Orientation | None
     panels_m: tuple[Polygon, ...]
+    row_gap_m: float | None = None  # gap used for the chosen orientation
 
 
 def _footprint(module: ModuleSpec, orientation: Orientation, tilt_deg: float) -> tuple[float, float]:
@@ -54,6 +66,18 @@ def _footprint(module: ModuleSpec, orientation: Orientation, tilt_deg: float) ->
     along_slope = module.length_m if orientation == "portrait" else module.width_m
     across = module.width_m if orientation == "portrait" else module.length_m
     return across, along_slope * math.cos(math.radians(tilt_deg))
+
+
+def row_gap(module: ModuleSpec, orientation: Orientation, params: LayoutParams) -> float:
+    """Gap behind a row: the shadow of its raised edge, never less than the minimum."""
+    elevation = params.shade_free_sun_elevation_deg
+    if elevation is None or params.tilt_deg == 0:
+        return params.row_gap_m
+    if not 0 < elevation < 90:
+        raise DomainError("invalid_layout", "Sun elevation for row spacing must be between 0 and 90 degrees.")
+    along_slope = module.length_m if orientation == "portrait" else module.width_m
+    height = along_slope * math.sin(math.radians(params.tilt_deg))
+    return max(params.row_gap_m, height / math.tan(math.radians(elevation)))
 
 
 def _grid(area: BaseGeometry, w: float, d: float, pitch: float, ox: float, oy: float) -> np.ndarray:
@@ -89,14 +113,16 @@ def pack_panels(usable_m: BaseGeometry, module: ModuleSpec, params: LayoutParams
 
     best: np.ndarray = np.empty(0, dtype=object)
     best_orientation: Orientation | None = None
+    best_gap: float | None = None
     for orientation in ORIENTATIONS:
         w, d = _footprint(module, orientation, params.tilt_deg)
-        pitch = d + params.row_gap_m
+        gap = row_gap(module, orientation, params)
+        pitch = d + gap
         for fy in GRID_OFFSETS:
             for fx in GRID_OFFSETS:
                 boxes = _grid(area, w, d, pitch, fx * w, fy * pitch)
                 if len(boxes) > len(best):
-                    best, best_orientation = boxes, orientation
+                    best, best_orientation, best_gap = boxes, orientation, gap
 
     panels = tuple(rotate(b, -params.azimuth_deg, origin=origin) for b in best)
     count = len(panels)
@@ -105,6 +131,7 @@ def pack_panels(usable_m: BaseGeometry, module: ModuleSpec, params: LayoutParams
         capacity_kwp=round(count * module.wp / 1000, 3),
         orientation=best_orientation if count else None,
         panels_m=panels,
+        row_gap_m=best_gap if count else None,
     )
 
 

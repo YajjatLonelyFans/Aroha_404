@@ -1,0 +1,16 @@
+[
+ {
+  "display_name": "Shaheed Sukhdev College of Business Studies, Doctor Kailash Nath Katju Marg, Rohini, Delhi, North West Delhi, Delhi, 110089, India",
+  "lat": "28.7326953",
+  "lon": "77.1189920",
+  "category": "amenity",
+  "type": "college"
+ },
+ {
+  "display_name": "Connaught Place, New Delhi, Delhi, 110001, India",
+  "lat": "28.6317695",
+  "lon": "77.2193804",
+  "category": "place",
+  "type": "suburb"
+ }
+]

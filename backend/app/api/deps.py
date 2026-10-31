@@ -1,9 +1,29 @@
 """FastAPI dependencies that assemble services from app state."""
 
-from fastapi import Request
+from typing import Annotated
 
+from fastapi import Depends, Request
+
+from app.core.assumptions import Assumptions
+from app.core.errors import AppError
+from app.db.store import DocumentStore, MongoStore
 from app.db.weather_repo import MongoWeatherRepo, NoCacheWeatherRepo, WeatherRepo
+from app.services.geo_service import GeoService
+from app.services.roof_service import RoofService
+from app.services.solar_service import SolarService
+from app.services.user_service import UserService
 from app.services.weather_service import WeatherService
+
+
+def get_assumptions(request: Request) -> Assumptions:
+    return request.app.state.assumptions
+
+
+def get_store(request: Request) -> DocumentStore:
+    mongo = request.app.state.mongo
+    if mongo is None:
+        raise AppError("database_unavailable", "The database is not configured.", status_code=503, retryable=True)
+    return MongoStore(mongo[request.app.state.settings.mongodb_db])
 
 
 def weather_repo(request: Request) -> WeatherRepo:
@@ -14,6 +34,29 @@ def weather_repo(request: Request) -> WeatherRepo:
     return MongoWeatherRepo(mongo[request.app.state.settings.mongodb_db])
 
 
-def get_weather_service(request: Request) -> WeatherService:
-    state = request.app.state
-    return WeatherService(state.weather_provider, weather_repo(request), state.assumptions)
+AssumptionsDep = Annotated[Assumptions, Depends(get_assumptions)]
+StoreDep = Annotated[DocumentStore, Depends(get_store)]
+
+
+def get_weather_service(
+    request: Request, assumptions: AssumptionsDep, repo: Annotated[WeatherRepo, Depends(weather_repo)]
+) -> WeatherService:
+    return WeatherService(request.app.state.weather_provider, repo, assumptions)
+
+
+def get_user_service(request: Request, store: StoreDep, assumptions: AssumptionsDep) -> UserService:
+    return UserService(store, assumptions, request.app.state.settings.meko_enabled_default)
+
+
+def get_geo_service(request: Request, assumptions: AssumptionsDep) -> GeoService:
+    return GeoService(request.app.state.geocoder, assumptions)
+
+
+def get_roof_service(store: StoreDep, assumptions: AssumptionsDep) -> RoofService:
+    return RoofService(store, assumptions)
+
+
+def get_solar_service(
+    store: StoreDep, assumptions: AssumptionsDep, weather: Annotated[WeatherService, Depends(get_weather_service)]
+) -> SolarService:
+    return SolarService(store, weather, assumptions)

@@ -71,6 +71,12 @@ def parse_polygon(geojson: dict[str, Any], what: str = "outline") -> Polygon:
     return poly
 
 
+def check_point_in_bbox(lat: float, lon: float, bbox: tuple[float, float, float, float]) -> None:
+    min_lon, min_lat, max_lon, max_lat = bbox
+    if not (min_lat <= lat <= max_lat and min_lon <= lon <= max_lon):
+        raise DomainError("outside_delhi", "The location must be inside Delhi.")
+
+
 def _check_outline(outline: Polygon, params: GeometryParams) -> float:
     min_lon, min_lat, max_lon, max_lat = params.bbox
     if not box(min_lon, min_lat, max_lon, max_lat).contains(outline):

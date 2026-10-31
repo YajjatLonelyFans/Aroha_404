@@ -55,6 +55,11 @@ async def check_health(
     dependencies = {
         "mongo": await _mongo_status(mongo),
         "open_meteo": await _open_meteo_status(settings, deep),
+        "nominatim": _key_status(
+            settings.nominatim_user_agent,
+            hint="Set NOMINATIM_USER_AGENT (app name and contact email)",
+            is_mock=settings.use_mock_geocoding,
+        ),
         "meko": _key_status(
             settings.meko_mcp_url,
             settings.meko_api_key,

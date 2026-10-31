@@ -9,38 +9,44 @@
     "source": "Sunova SS-550-72MDH mono PERC datasheet (Pmax temp. coeff. -0.35 %/degC, NOCT 45+/-2 degC, 2279 x 1134 x 35 mm), https://download.axilogi.com/Sunova/SS-535-550-72MDH.pdf, accessed 2026-11-01"
   },
   "layout": {
-    "edge_setback_m": null,
-    "no_go_clearance_m": null,
-    "row_gap_m": null,
-    "flush_gap_m": null,
-    "default_flat_tilt_deg": null,
+    "edge_setback_m": 0.6,
+    "no_go_clearance_m": 0.3,
+    "row_gap_m": 0.3,
+    "flush_gap_m": 0.02,
+    "default_flat_tilt_deg": 20,
     "default_azimuth_deg": 0,
-    "source": null
+    "source": "Row spacing on flat roofs is CALCULATED per house and panel orientation: gap = raised-edge height / tan(sun elevation at noon on the December solstice), with elevation = 90 - latitude - 23.44 (about 38 deg in Delhi). At 20 deg tilt that is about 1.0 m for portrait panels and 0.5 m for landscape. row_gap_m is the MINIMUM gap (DESIGN CHOICE: room to reach panels for cleaning). DESIGN CHOICES (Aroha, to review with an installer): edge_setback 0.6 m walkway along the parapet, 0.3 m clear around tanks/stair rooms, 0.02 m clamp gap for flush-mounted rows on sloped roofs, 20 deg default tilt on flat roofs (below latitude to keep row spacing and wind load down), facing south."
   },
   "capacity": {
-    "shading_haircut_fraction": null,
-    "small_area_m2": null,
-    "many_obstructions_fraction": null,
-    "source": null
+    "shading_haircut_fraction": 0.25,
+    "small_area_m2": 10,
+    "many_obstructions_fraction": 0.3,
+    "source": "small_area_m2: about 10 sq m of shadow-free roof per kW (MSEDCL rooftop solar FAQ, https://www.mahadiscom.in/ismart/media/faq.pdf; MNRE/PIB rooftop FAQ gives 10-12 sq m per kWp). DESIGN CHOICES (Aroha): drop 25% of panels from the minimum when a side has heavy shade; warn when no-go areas cover more than 30% of the outline."
   },
   "losses": {
     "l_other_fraction": 0.15,
-    "shading_by_level": { "none": 0, "partial": null, "heavy": null },
-    "shading_cap_fraction": null,
-    "source": "l_other: NREL PVWatts v5 default losses (Dobos 2014, NREL/TP-6A20-62641; same defaults in pvlib pvwatts_losses) without shading: soiling 2%, mismatch 2%, wiring 2%, connections 0.5%, LID 1.5%, nameplate 1%, availability 3% (combined 11.4%), times 96% nominal inverter efficiency (PVWatts default) = 15.0%. Temperature excluded (handled by gamma)."
+    "shading_by_level": { "none": 0, "partial": 0.05, "heavy": 0.15 },
+    "shading_cap_fraction": 0.3,
+    "source": "l_other: NREL PVWatts v5 default losses (Dobos 2014, NREL/TP-6A20-62641; same defaults in pvlib pvwatts_losses) without shading: soiling 2%, mismatch 2%, wiring 2%, connections 0.5%, LID 1.5%, nameplate 1%, availability 3% (combined 11.4%), times 96% nominal inverter efficiency (PVWatts default) = 15.0%. Temperature excluded (handled by gamma). Shading per side (partial 5%, heavy 15%, total capped at 30%): DESIGN CHOICE (Aroha heuristic from 2-3 homeowner questions, not a shade simulation); confidence is lowered whenever shade is reported."
   },
   "costs": {
-    "cost_per_kwp_inr": null,
-    "source": null,
-    "as_of": null
+    "cost_per_kwp_inr": 50000,
+    "source": "MNRE benchmark cost for residential rooftop solar under PM Surya Ghar: INR 50,000 per kW for the first 2 kW (INR 45,000 for additional kW), effective 13 Feb 2024, as reported by Indian Infrastructure / pv magazine India. A benchmark, so real installer quotes are often higher. TO VERIFY on pmsuryaghar.gov.in.",
+    "as_of": "2024-02-13"
   },
   "tariff": {
     "discom": "BRPL",
-    "slabs": [],
-    "fixed_charges_inr": null,
-    "export_rate_inr": null,
-    "source": null,
-    "as_of": null
+    "slabs": [
+      { "up_to_kwh": 200, "rate_inr_per_kwh": 3.0 },
+      { "up_to_kwh": 400, "rate_inr_per_kwh": 4.5 },
+      { "up_to_kwh": 800, "rate_inr_per_kwh": 6.5 },
+      { "up_to_kwh": 1200, "rate_inr_per_kwh": 7.0 },
+      { "up_to_kwh": null, "rate_inr_per_kwh": 8.0 }
+    ],
+    "fixed_charges_inr": 20,
+    "export_rate_inr": 3.0,
+    "source": "Slabs and fixed charge: DERC Tariff Schedule FY 2019-20 for BRPL/BYPL/TPDDL/NDMC, domestic individual connections (energy 3.00/4.50/6.50/7.00/8.00 Rs per kWh; fixed 20 Rs/kW/month up to 2 kW, not used in savings), https://www.derc.gov.in/sites/default/files/TARIFF%20SCHEDULE%20FY%202019-20.pdf - latest official schedule found; excludes PPAC/FPPAS surcharges and the Delhi free-units subsidy. export_rate_inr: UNVERIFIED - secondary sources put the year-end net-metering settlement (APPC) at about Rs 3-4.30 per unit; the low end is used. Confirm both against the current DERC tariff order and net-metering regulations.",
+    "as_of": "2019-04-01"
   },
   "seasons": {
     "winter": [12, 1, 2],
@@ -59,8 +65,8 @@
     "source": "rain_min_mm: IMD 'rainy day' definition (24-hour rainfall of 2.5 mm or more). Ratios (day plane-of-array sunlight vs a typical day of that month from the 10-year climatology): Aroha design choice, display labels only, never used in estimates."
   },
   "validation": {
-    "min_outline_m2": null,
-    "max_outline_m2": null,
+    "min_outline_m2": 10,
+    "max_outline_m2": 2000,
     "delhi_bbox": [76.83, 28.40, 77.35, 28.89]
   }
 }

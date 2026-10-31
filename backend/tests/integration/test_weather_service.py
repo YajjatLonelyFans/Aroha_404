@@ -1,4 +1,3 @@
-import copy
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -6,74 +5,12 @@ import pytest
 from app.domain.errors import DomainError
 from app.integrations.weather.base import WeatherUnavailable
 from app.services.weather_service import WeatherService, grid_key, specific_yield_from_doc
-from tests.weather_data import OUTLOOK_READY, UNSET, YIELD_READY, assumptions, current_conditions, series
+from tests.fakes import FakeWeatherProvider as FakeProvider
+from tests.fakes import FakeWeatherRepo as FakeRepo
+from tests.weather_data import OUTLOOK_READY, UNSET, YIELD_READY, assumptions
 
 NOW = datetime(2026, 11, 1, 6, 30, tzinfo=timezone.utc)
 LAT, LON = 28.6139, 77.2090
-
-
-class FakeRepo:
-    """In-memory stand-in for MongoWeatherRepo."""
-
-    def __init__(self):
-        self.climatology, self.current_docs, self.forecasts = {}, {}, {}
-        self.saves = 0
-
-    @staticmethod
-    def _k(key):
-        return tuple(sorted(key.items()))
-
-    async def find_climatology(self, key):
-        doc = self.climatology.get(self._k(key))
-        return copy.deepcopy(doc)
-
-    async def save_climatology(self, key, doc):
-        self.saves += 1
-        stored = copy.deepcopy(doc)
-        stored["_id"] = f"clim-{self.saves}"
-        self.climatology[self._k(key)] = stored
-        return stored["_id"]
-
-    async def find_current(self, key, now):
-        doc = self.current_docs.get(self._k(key))
-        return copy.deepcopy(doc) if doc and doc["expires_at"] > now else None
-
-    async def save_current(self, key, doc):
-        self.current_docs[self._k(key)] = copy.deepcopy(doc)
-
-    async def find_forecast(self, key, now):
-        doc = self.forecasts.get(self._k(key))
-        return copy.deepcopy(doc) if doc and doc["expires_at"] > now else None
-
-    async def save_forecast(self, key, doc):
-        self.forecasts[self._k(key)] = copy.deepcopy(doc)
-
-
-class FakeProvider:
-    def __init__(self, is_mock=False, fail=False):
-        self.is_mock = is_mock
-        self.fail = fail
-        self.calls = {"history": 0, "current": 0, "forecast": 0}
-        self.history_args = None
-
-    async def hourly_history(self, lat, lon, tilt, azimuth, start, end):
-        self.calls["history"] += 1
-        self.history_args = (lat, lon, tilt, azimuth, start, end)
-        if self.fail:
-            raise WeatherUnavailable("down")
-        return series(start, end, is_mock=self.is_mock)
-
-    async def current(self, lat, lon):
-        self.calls["current"] += 1
-        if self.fail:
-            raise WeatherUnavailable("down")
-        return current_conditions(self.is_mock)
-
-    async def forecast(self, lat, lon, tilt, azimuth, days=7):
-        self.calls["forecast"] += 1
-        if self.fail:
-            raise WeatherUnavailable("down")
-        return series(date(2026, 11, 1), date(2026, 11, 1) + timedelta(days=days - 1), is_mock=self.is_mock)
 
 
 class Clock:

@@ -1,22 +1,15 @@
 """Weather provider interface. Values stay `None` when the provider has no data."""
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Protocol
 
 from app.core.errors import AppError
+from app.integrations.common import SourceInfo  # noqa: F401  (re-exported for the adapters)
 
 HISTORY_VARS = ("global_tilted_irradiance", "temperature_2m", "cloud_cover", "precipitation", "sunshine_duration")
 FORECAST_VARS = ("global_tilted_irradiance", "cloud_cover", "precipitation", "temperature_2m")
 CURRENT_VARS = ("temperature_2m", "relative_humidity_2m", "precipitation", "cloud_cover", "wind_speed_10m", "is_day")
-
-
-@dataclass(frozen=True)
-class SourceInfo:
-    name: str
-    url: str
-    retrieved_at: datetime
-    is_mock: bool = False
 
 
 @dataclass(frozen=True)

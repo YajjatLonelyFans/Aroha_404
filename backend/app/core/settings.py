@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     llm_model: str = ""
 
     use_mock_weather: bool = False
+    use_mock_geocoding: bool = False
     use_mock_meko: bool = False
     use_mock_llm: bool = False
 

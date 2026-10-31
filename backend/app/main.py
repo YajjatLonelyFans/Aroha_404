@@ -10,13 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import PyMongoError
 
 from app import __version__
-from app.api.routes import health, weather
+from app.api.routes import geo, health, roof, solar, users, weather
 from app.core.assumptions import load_assumptions
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
-from app.core.settings import Settings, get_settings
+from app.core.settings import Settings, get_settings, is_configured
 from app.db.client import create_client
 from app.db.indexes import ensure_indexes
+from app.integrations.geocoding.base import UnconfiguredGeocoder
+from app.integrations.geocoding.mock import MockGeocoder
+from app.integrations.geocoding.nominatim import NominatimGeocoder
 from app.integrations.weather.mock import MockWeatherProvider
 from app.integrations.weather.open_meteo import OpenMeteoProvider
 
@@ -52,6 +55,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.weather_provider = OpenMeteoProvider(
                 app.state.http, settings.open_meteo_archive_url, settings.open_meteo_forecast_url
             )
+        if settings.use_mock_geocoding:
+            log.warning("USE_MOCK_GEOCODING is on: address search returns recorded data, labelled mock")
+            app.state.geocoder = MockGeocoder()
+        elif is_configured(settings.nominatim_user_agent):
+            app.state.geocoder = NominatimGeocoder(
+                app.state.http, settings.nominatim_base_url, settings.nominatim_user_agent
+            )
+        else:
+            log.warning("NOMINATIM_USER_AGENT is not set; address search is off (pins still work)")
+            app.state.geocoder = UnconfiguredGeocoder()
         try:
             yield
         finally:
@@ -69,7 +82,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api")
-    app.include_router(weather.router, prefix="/api")
+    for module in (users, geo, roof, weather, solar):
+        app.include_router(module.router, prefix="/api")
     return app
 
 

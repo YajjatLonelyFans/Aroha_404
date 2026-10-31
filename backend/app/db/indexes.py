@@ -13,11 +13,12 @@ AGENT_LOG_TTL_SECONDS = 30 * 24 * 60 * 60
 
 INDEXES: dict[str, list[IndexModel]] = {
     c.PROPERTIES: [
-        IndexModel([("user_id", ASCENDING)], name="user_id"),
+        IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_latest"),
         IndexModel([("pin", GEOSPHERE)], name="pin_2dsphere"),
     ],
     c.ROOF_ASSESSMENTS: [
         IndexModel([("property_id", ASCENDING), ("created_at", DESCENDING)], name="property_latest"),
+        IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_latest"),
     ],
     c.WEATHER_RECORDS: [
         IndexModel(
@@ -42,6 +43,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     c.SOLAR_ESTIMATES: [
         IndexModel([("property_id", ASCENDING), ("created_at", DESCENDING)], name="property_latest"),
+        IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_latest"),
     ],
     c.POLICY_RECORDS: [
         IndexModel([("scheme_id", ASCENDING), ("verified_on", DESCENDING)], name="scheme_latest"),
