@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* Brand tokens from docs/DESIGN_SYSTEM.md. Names follow shadcn's so its components pick them up. */
+:root {
+  --aroha-forest: #073f32;
+  --aroha-amber: #e6a43a;
+  --aroha-ivory: #f7f5ef;
+  --aroha-charcoal: #111111;
+  --aroha-white: #ffffff;
+
+  --background: var(--aroha-ivory);
+  --foreground: var(--aroha-charcoal);
+  --card: var(--aroha-white);
+  --card-foreground: var(--aroha-charcoal);
+  --primary: var(--aroha-forest);
+  --primary-foreground: var(--aroha-ivory);
+  /* Amber fails AA as text: use it for fills, icons and chart marks only. */
+  --accent: var(--aroha-amber);
+  --accent-foreground: var(--aroha-charcoal);
+  --muted: #ebe8df;
+  --muted-foreground: #5b6560;
+  --border: #dcd8cc;
+  --ring: var(--aroha-forest);
+  --radius: 0.75rem;
+
+  /* Status colours, all AA (>= 4.5:1) on white and ivory. */
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --info: #1d4ed8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --color-forest: var(--aroha-forest);
+  --color-sun: var(--aroha-amber);
+  --color-ivory: var(--aroha-ivory);
+  --color-charcoal: var(--aroha-charcoal);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-montserrat), var(--font-inter), ui-sans-serif, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 16px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--primary);
+}
