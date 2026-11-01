@@ -1,10 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
 from app.agents.orchestrator.pipeline import Orchestrator
-from app.api.deps import get_orchestrator
-from app.schemas.assistant import ChatRequest, ChatResponse
+from app.api.deps import StoreDep, get_orchestrator
+from app.core.errors import NotFoundError
+from app.db import collections as c
+from app.schemas.assistant import AgentLogsResponse, ChatRequest, ChatResponse
+from app.services.agent_log_service import recent_logs
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -21,3 +24,16 @@ async def chat(
     if commit is not None:
         background.add_task(commit)
     return response
+
+
+@router.get("/logs", response_model=AgentLogsResponse)
+async def logs(
+    store: StoreDep,
+    user_id: Annotated[str, Query()],
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> AgentLogsResponse:
+    """Recent chat turns for the agent log: agents, timings, and each Meko call, including the
+    memory saves made after the reply."""
+    if await store.get(c.USERS, user_id) is None:
+        raise NotFoundError("User")
+    return await recent_logs(store, user_id, limit)

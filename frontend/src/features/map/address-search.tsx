@@ -42,7 +42,7 @@ export function AddressSearch({ onPick }: { onPick: (place: Place) => void }) {
           id="address-q"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="House, street or area in Delhi"
+          placeholder="House, street or area"
           autoComplete="street-address"
           className="h-11 min-w-0 flex-1 rounded-md border border-border bg-card px-3 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
         />
@@ -60,7 +60,8 @@ export function AddressSearch({ onPick }: { onPick: (place: Place) => void }) {
         <div className="flex flex-col gap-1">
           {state.response.results.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nothing found in Delhi. Try a nearby landmark, or move the map and click on your roof.
+              Nothing found in the area Aroha covers (Delhi for now). Try a nearby landmark, or move the map and click
+              on your roof.
             </p>
           ) : (
             <ul className="flex flex-col gap-1" aria-label="Search results">

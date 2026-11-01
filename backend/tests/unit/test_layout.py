@@ -148,6 +148,7 @@ CAP = CapacityParams(
     shading_haircut_fraction=0.25,
     small_area_m2=10,
     many_obstructions_fraction=0.3,
+    large_outline_m2=420,
 )
 
 
@@ -209,3 +210,15 @@ def test_unknown_shading_rejected():
         _cap(shading={"up": "heavy"})
     with pytest.raises(DomainError):
         _cap(shading={"south": "total"})
+
+
+def test_very_large_outline_warns_and_is_not_high_confidence():
+    # 495 m² (a 22 m square) is bigger than most Delhi house roofs: it may cover more than one.
+    r = _cap(outline_area_m2=495, usable_area_m2=440, panel_count=100)
+    assert "large_outline" in _codes(r)
+    assert "only your own roof" in r.constraints[_codes(r).index("large_outline")].message
+    assert r.confidence == "medium"
+
+
+def test_ordinary_outline_has_no_size_warning():
+    assert "large_outline" not in _codes(_cap(outline_area_m2=200, usable_area_m2=160))

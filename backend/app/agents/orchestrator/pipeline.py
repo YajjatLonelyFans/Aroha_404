@@ -26,7 +26,7 @@ from app.db import collections as c
 from app.db.store import DocumentStore
 from app.integrations.llm.base import LLMProvider, LLMRateLimited, LLMUnavailable
 from app.integrations.meko.base import MemoryHit, MemoryProvider, MemoryUnavailable, agent_key
-from app.schemas.assistant import ChatRequest, ChatResponse, LLMInfo, MemoryInfo
+from app.schemas.assistant import ChatRequest, ChatResponse, LLMInfo, MemoryCallOut, MemoryInfo
 from app.services.application_service import ApplicationService
 from app.services.policy_service import PolicyService
 from app.services.weather_service import WeatherService, utc_now
@@ -127,12 +127,14 @@ class Orchestrator:
         # 6. Log the run; memory writes happen after the reply is sent.
         candidates = self._candidates(outputs, recalled, user) if use_memory and conversation_id else []
         mem.written = len(candidates)
+        mem.calls = [MemoryCallOut(**call) for call in meko_calls]
+        latency_ms = _ms(started)
         log_id = await self._store.insert(c.AGENT_LOGS, {
             "run_id": run_id,
             "user_id": req.user_id,
             "agents": list(agents),
             "status": "ok",
-            "latency_ms": _ms(started),
+            "latency_ms": latency_ms,
             "timings": timings,
             "meko": {"enabled": req.meko_enabled, "live": mem.live, "is_mock": mem.is_mock,
                      "error": mem.error, "calls": meko_calls},
@@ -144,7 +146,7 @@ class Orchestrator:
 
         response = ChatResponse(
             run_id=run_id, reply=reply, agents=list(agents), agent_outputs=list(outputs),
-            memory=mem, llm=llm_info, notes=notes,
+            memory=mem, llm=llm_info, notes=notes, latency_ms=latency_ms, timings=timings,
         )
         return response, job
 

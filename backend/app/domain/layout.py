@@ -155,6 +155,7 @@ class CapacityParams:
     shading_haircut_fraction: float  # share of panels dropped from `min` under heavy shade
     small_area_m2: float
     many_obstructions_fraction: float
+    large_outline_m2: float  # above this the outline may cover more than one roof
 
 
 @dataclass(frozen=True)
@@ -222,6 +223,13 @@ def assess_capacity(
             f"Tanks, stair rooms and other no-go areas take up "
             f"{round_pct(100 * no_go_area_m2 / outline_area_m2):g}% of the roof.",
         ))
+    large = outline_area_m2 > params.large_outline_m2
+    if large:
+        constraints.append(Constraint(
+            "large_outline",
+            f"The outline is about {round_area_m2(outline_area_m2):g} m², larger than most Delhi house roofs. "
+            "Check that it covers only your own roof.",
+        ))
     if roof_type == "sloped" and abs(azimuth_deg) > 90:
         constraints.append(Constraint(
             "north_facing_slope", "The roof slopes away from the sun, which lowers output."
@@ -232,7 +240,7 @@ def assess_capacity(
 
     if heavy or small or panel_count == 0:
         confidence: Confidence = "low"
-    elif roof_type == "flat" and traced and not partial:
+    elif roof_type == "flat" and traced and not partial and not large:
         confidence = "high"
     else:
         confidence = "medium"

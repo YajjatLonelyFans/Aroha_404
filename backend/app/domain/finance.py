@@ -10,7 +10,7 @@ from typing import Literal
 from app.domain.errors import DomainError
 from app.domain.generation import Percentiles
 
-BindingConstraint = Literal["roof", "consumption", "limit"]
+BindingConstraint = Literal["roof", "consumption", "limit", "minimum"]
 
 
 @dataclass(frozen=True)
@@ -56,8 +56,13 @@ def recommend_size(
     annual_consumption_kwh: float,
     annual_yield_kwh_per_kwp: float,
     limit_kwp: float | None = None,
+    min_kwp: float | None = None,
 ) -> SizeRecommendation:
-    """Smaller of what fits on the roof and what the household uses, in whole modules."""
+    """Smaller of what fits on the roof and what the household uses, in whole modules.
+
+    When use alone asks for less than `min_kwp`, the recommendation is raised to `min_kwp`
+    (binding "minimum"), as long as the roof and any limit allow it.
+    """
     if module_wp <= 0:
         raise DomainError("invalid_module", "Module wattage must be positive.")
     if annual_yield_kwh_per_kwp <= 0:
@@ -74,6 +79,13 @@ def recommend_size(
     if limit_kwp is not None:
         candidates.append((math.floor(limit_kwp / kw_per_module + 1e-9), "limit"))
     count, binding = min(candidates, key=lambda c: c[0])  # first listed wins a tie
+    if binding == "consumption" and min_kwp is not None:
+        floor_count = math.ceil(min_kwp / kw_per_module - 1e-9)
+        if count < floor_count:
+            # Raise to the minimum, unless the roof or a limit is smaller still.
+            ceilings = [c for c in candidates if c[1] != "consumption"]
+            ceiling, ceiling_binding = min(ceilings, key=lambda c: c[0])
+            count, binding = (floor_count, "minimum") if floor_count <= ceiling else (ceiling, ceiling_binding)
 
     return SizeRecommendation(
         roof_kwp=round(roof_panel_count * kw_per_module, 3),

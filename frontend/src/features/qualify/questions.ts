@@ -43,7 +43,7 @@ export type Step = {
 };
 
 export const STEPS: Step[] = [
-  { key: "property_type", title: "What kind of home is it?", help: "Aroha covers independent houses and builder floors in Delhi." },
+  { key: "property_type", title: "What kind of home is it?", help: "Aroha covers independent houses and builder floors (in Delhi for now)." },
   { key: "has_roof_rights", title: "Can you use the roof for solar panels?", help: "Panels need the roof owner's agreement." },
   { key: "monthly_units_kwh", title: "About how many units do you use a month?", help: "Units (kWh) are on your electricity bill. A rough figure is fine." },
   { key: "discom", title: "Who supplies your electricity?", help: "This decides the tariff and the net-metering steps." },

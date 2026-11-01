@@ -21,7 +21,9 @@
     "shading_haircut_fraction": 0.25,
     "small_area_m2": 10,
     "many_obstructions_fraction": 0.3,
-    "source": "small_area_m2: about 10 sq m of shadow-free roof per kW (MSEDCL rooftop solar FAQ, https://www.mahadiscom.in/ismart/media/faq.pdf; MNRE/PIB rooftop FAQ gives 10-12 sq m per kWp). DESIGN CHOICES (Aroha): drop 25% of panels from the minimum when a side has heavy shade; warn when no-go areas cover more than 30% of the outline."
+    "large_outline_m2": 420,
+    "min_recommended_kwp": 1.0,
+    "source": "small_area_m2: about 10 sq m of shadow-free roof per kW (MSEDCL rooftop solar FAQ, https://www.mahadiscom.in/ismart/media/faq.pdf; MNRE/PIB rooftop FAQ gives 10-12 sq m per kWp). min_recommended_kwp: utility sizing guidance puts homes using 0-150 units a month at 1-2 kW (JBVNL PM Surya Ghar CFA structure, https://jbvnl.co.in/SOLAR/CFA_structure%20for%20PM%20Suryaghar.pdf) and central subsidy tiers start at 1 kW; smaller systems are rarely installed. DESIGN CHOICES (Aroha): drop 25% of panels from the minimum when a side has heavy shade; warn when no-go areas cover more than 30% of the outline; warn when an outline is over 420 sq m (about 500 sq yd, the upper end of common Delhi residential plots) as it may cover more than one roof."
   },
   "losses": {
     "l_other_fraction": 0.15,
@@ -35,7 +37,7 @@
     "as_of": "2024-02-13"
   },
   "tariff": {
-    "discom": "BRPL",
+    "discoms": ["BRPL", "BYPL", "TPDDL", "NDMC"],
     "slabs": [
       { "up_to_kwh": 200, "rate_inr_per_kwh": 3.0 },
       { "up_to_kwh": 400, "rate_inr_per_kwh": 4.5 },

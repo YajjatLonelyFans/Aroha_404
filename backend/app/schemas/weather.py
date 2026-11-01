@@ -55,6 +55,7 @@ class ClimatologyResponse(BaseModel):
     years: list[int]
     monthly: list[ClimatologyMonth]
     season_notes: list[SeasonNoteOut]
+    seasons: dict[str, list[int]]  # season name -> months (1-12), from the assumptions file
     specific_yield: SpecificYieldOut | None
     units: dict[str, str]
     assumptions: list[str]

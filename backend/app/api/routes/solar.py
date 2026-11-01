@@ -15,3 +15,11 @@ async def estimate(
 ) -> SolarEstimateResponse:
     """Monthly and yearly generation range with cost, savings and payback for 1-3 sizes."""
     return await svc.estimate(body)
+
+
+@router.get("/estimates/{estimate_id}", response_model=SolarEstimateResponse)
+async def get_estimate(
+    estimate_id: str, svc: Annotated[SolarService, Depends(get_solar_service)]
+) -> SolarEstimateResponse:
+    """A saved estimate, to show it again when the homeowner returns."""
+    return await svc.get(estimate_id)

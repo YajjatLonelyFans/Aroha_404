@@ -46,7 +46,7 @@ def _r(value: float | None, fn: Callable[[float], float]) -> float | None:
 
 
 def option_counts(
-    recommended: int, roof_max: int, module_wp: float, requested_kwp: list[float] | None
+    recommended: int, roof_max: int, module_wp: float, requested_kwp: list[float] | None, min_count: int = 1
 ) -> list[int]:
     """Panel counts to compare: the user's sizes, or the recommended size and its neighbours."""
     if requested_kwp:
@@ -63,7 +63,7 @@ def option_counts(
             counts.append(n)
         return sorted(set(counts))
     step = max(1, round(NEIGHBOUR_STEP_KWP * 1000 / module_wp))
-    return sorted({n for n in (recommended - step, recommended, recommended + step) if 1 <= n <= roof_max})
+    return sorted({n for n in (recommended - step, recommended, recommended + step) if min_count <= n <= roof_max})
 
 
 class SolarService:
@@ -123,16 +123,23 @@ class SolarService:
             module_wp=module_wp,
             annual_consumption_kwh=monthly_units * 12,
             annual_yield_kwh_per_kwp=annual_yield,
+            min_kwp=a.require("capacity.min_recommended_kwp"),
         )
         recommended = max(size.panel_count, 1)
-        counts = option_counts(recommended, roof_max, module_wp, req.capacities_kwp)
+        counts = option_counts(recommended, roof_max, module_wp, req.capacities_kwp,
+                               min_count=recommended if size.binding_constraint == "minimum" else 1)
+        if size.binding_constraint == "minimum":
+            notes.append(
+                f"Your use alone needs about {round_kwp(size.consumption_kwp):g} kWp; "
+                f"{round_kwp(size.recommended_kwp):g} kWp is suggested because smaller systems are rarely installed."
+            )
 
         slabs: list[Slab] = []
-        if a.tariff.discom == user["discom"]:
+        if user["discom"] in a.tariff.discoms:
             slabs = [Slab(s.up_to_kwh, s.rate_inr_per_kwh) for s in a.tariff.slabs]
         else:
             notes.append(
-                f"Savings need the {user['discom']} tariff, but the assumptions file has {a.tariff.discom} only."
+                f"Savings need your DISCOM's tariff; the assumptions file covers {', '.join(a.tariff.discoms)} only."
             )
         options: list[EstimateOption] = []
         record_ids: set[str] = set()
@@ -206,7 +213,7 @@ class SolarService:
             assumptions.append(f"Installed cost {a.costs.cost_per_kwp_inr:,.0f} INR per kWp (as of {a.costs.as_of}).")
         if slabs and a.tariff.export_rate_inr is not None:
             assumptions.append(
-                f"{a.tariff.discom} slab tariff as of {a.tariff.as_of}; "
+                f"Delhi domestic slab tariff ({'/'.join(a.tariff.discoms)}) as of {a.tariff.as_of}; "
                 f"units sent to the grid credited at {a.tariff.export_rate_inr:g} INR each."
             )
 
@@ -235,8 +242,11 @@ class SolarService:
             "model_version": MODEL_VERSION,
             "is_mock": bool(clim.get("is_mock")),
         }
+        src = clim["source"]
+        sources = [Source(name=src["name"], url=src.get("url"), retrieved_at=src["retrieved_at"], note=ATTRIBUTION)]
         estimate_id = await self._store.insert(c.SOLAR_ESTIMATES, {
             **response_fields,
+            "sources": [s.model_dump() for s in sources],
             "user_id": req.user_id,
             "property_id": assessment["property_id"],
             "policy_record_ids": sorted(record_ids),
@@ -244,9 +254,11 @@ class SolarService:
             "created_at": self._clock(),
         })
 
-        src = clim["source"]
-        return SolarEstimateResponse(
-            estimate_id=estimate_id,
-            sources=[Source(name=src["name"], url=src.get("url"), retrieved_at=src["retrieved_at"], note=ATTRIBUTION)],
-            **response_fields,
-        )
+        return SolarEstimateResponse(estimate_id=estimate_id, sources=sources, **response_fields)
+
+    async def get(self, estimate_id: str) -> SolarEstimateResponse:
+        doc = await self._store.get(c.SOLAR_ESTIMATES, estimate_id)
+        if doc is None:
+            raise NotFoundError("Solar estimate")
+        fields = {k: doc[k] for k in SolarEstimateResponse.model_fields if k not in ("estimate_id",) and k in doc}
+        return SolarEstimateResponse(estimate_id=estimate_id, **{"sources": [], **fields})

@@ -9,7 +9,7 @@ export default function Home() {
     <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-6 px-4 py-16 text-center">
       <Image src="/brand/AROHA_Symbol_Full_Color.svg" alt="" width={96} height={96} priority />
       <p className="font-heading text-sm font-medium tracking-[0.3em] text-primary">RISE WITH THE SUN.</p>
-      <h1 className="text-3xl sm:text-4xl">Is your Delhi roof ready for solar?</h1>
+      <h1 className="text-3xl sm:text-4xl">Is your roof ready for solar?</h1>
       <p className="max-w-xl text-lg text-muted-foreground">
         Aroha checks your roof, estimates what panels could generate from ten years of weather data, works out
         cost, subsidy and payback, and walks you through the application.
@@ -17,6 +17,8 @@ export default function Home() {
       <Link href="/start" className={buttonClass("primary", "mt-2")}>
         Check my roof
       </Link>
+      {/* Coverage is stated plainly: pins, tariffs, schemes and DISCOM steps are Delhi's for now. */}
+      <p className="text-sm text-muted-foreground">Available for homes in Delhi today.</p>
     </section>
   );
 }

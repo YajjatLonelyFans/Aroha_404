@@ -42,7 +42,7 @@ export async function createMap(
   config: Schemas["MapConfig"],
   view: { center: [number, number]; zoom: number },
 ): Promise<MapLibreMap> {
-  const { Map, NavigationControl, AttributionControl, getVersion, setWorkerUrl } = await import("maplibre-gl");
+  const { Map, NavigationControl, AttributionControl, ScaleControl, getVersion, setWorkerUrl } = await import("maplibre-gl");
   setWorkerUrl(`${WORKER_URL}?v=${getVersion()}`);
   const map = new Map({
     container,
@@ -54,6 +54,8 @@ export async function createMap(
   });
   map.addControl(new NavigationControl({ showCompass: false }), "top-right");
   map.addControl(new AttributionControl({ compact: false }), "bottom-right");
+  // A metric scale bar, so a traced roof can be checked against a known size (a car is about 4.5 m).
+  map.addControl(new ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
   // A slow imagery provider can fail a few tiles (the backend answers 503). The map just shows
   // those squares blank until it is moved, so log them quietly; anything else is a real error.
   map.on("error", ({ error }) => {

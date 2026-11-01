@@ -1,19 +1,20 @@
 "use client";
 
 import type { FeatureCollection } from "geojson";
+import Link from "next/link";
 import { useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import type { LatLon } from "@/features/map/map-view";
 import { ApiError, api, type Schemas } from "@/lib/api";
-import { formatArea } from "@/lib/format";
+import { formatArea, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { EMPTY_MANUAL, ManualDimensionsForm, manualValid, type ManualForm } from "./manual-dimensions";
 import { DEFAULT_DETAILS, RoofDetailsForm, checkTilt, type Details } from "./roof-details";
 import { RoofMap, type RoofMapHandle, type Tool } from "./roof-map";
 import { RoofResult } from "./roof-result";
-import { NO_GO_KINDS, areaM2, kindLabel, type Drawing, type NoGoKind, type Polygon } from "./roof-shapes";
+import { NO_GO_KINDS, areaM2, kindLabel, sideLengthsM, toSqFt, type Drawing, type NoGoKind, type Polygon } from "./roof-shapes";
 
 type Step = "outline" | "nogo" | "details" | "result";
 type Method = "map" | "manual";
@@ -58,7 +59,17 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
   const mapRef = useRef<RoofMapHandle>(null);
   const [method, setMethod] = useState<Method>(savedRoof?.manual_dimensions ? "manual" : "map");
   const [step, setStep] = useState<Step>(savedResult ? "result" : "outline");
-  const [drawing, setDrawing] = useState<Drawing>({ outline: null, noGo: [] });
+  // The saved drawing, loaded into the map once when it opens.
+  const [initial] = useState(() => ({
+    outline: (savedRoof?.outline as Polygon | null | undefined) ?? null,
+    noGo: (savedRoof?.no_go_areas ?? []).map((n) => ({ kind: n.kind, geometry: n.geometry as unknown as Polygon })),
+  }));
+  // Start from the saved drawing too, so the steps work before the map has loaded; the map
+  // replaces it (with its own shape ids) as soon as it is ready.
+  const [drawing, setDrawing] = useState<Drawing>(() => ({
+    outline: initial.outline,
+    noGo: initial.noGo.map((n, i) => ({ id: `saved-${i}`, ...n })),
+  }));
   const [drawingNoGo, setDrawingNoGo] = useState(false);
   const [noGoKind, setNoGoKind] = useState<NoGoKind>("water_tank");
   const [manual, setManual] = useState<ManualForm>(() => manualFrom(savedRoof));
@@ -68,11 +79,6 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // The saved drawing, loaded into the map once when it opens.
-  const [initial] = useState(() => ({
-    outline: (savedRoof?.outline as Polygon | null | undefined) ?? null,
-    noGo: (savedRoof?.no_go_areas ?? []).map((n) => ({ kind: n.kind, geometry: n.geometry as unknown as Polygon })),
-  }));
 
   const tool: Tool =
     method === "manual" || step === "details" || step === "result"
@@ -143,9 +149,23 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
 
         {step === "outline" && method === "map" && (
           <Panel title="Trace your roof" intro="Click each corner of the roof. Click the first corner again to finish. Then drag corners to fine-tune.">
-            <p className="rounded-md bg-muted p-3 text-sm tabular-nums">
-              {outlineArea === null ? "No outline yet." : <>Roof outline: about {formatArea(outlineArea)}</>}
-            </p>
+            <div className="rounded-md bg-muted p-3 text-sm tabular-nums">
+              {outlineArea === null || !drawing.outline ? (
+                "No outline yet."
+              ) : (
+                <>
+                  <p>
+                    Roof outline: about {formatArea(outlineArea)} ({formatNumber(toSqFt(outlineArea))} sq ft)
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Sides: {sideLengthsM(drawing.outline).map((m) => `${formatNumber(m, 1)} m`).join(", ")}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Check these against your plot or the scale bar on the map. Trace only your own roof.
+                  </p>
+                </>
+              )}
+            </div>
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => go("nogo")} disabled={!drawing.outline}>
                 Next: no-go areas
@@ -268,11 +288,9 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
           <>
             <RoofResult result={result} />
             <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-1">
-                {/* Enabled when the estimate screen (F5) lands. */}
-                <Button disabled>See my savings estimate</Button>
-                <span className="text-xs text-muted-foreground">The estimate screen is coming next.</span>
-              </div>
+              <Link href="/results" className={buttonClass("primary")}>
+                See my savings estimate
+              </Link>
               <Button variant="ghost" onClick={() => go("outline")}>
                 Change the roof drawing
               </Button>

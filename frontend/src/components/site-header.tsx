@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { AccountMenu } from "@/components/account-menu";
 import { BackendStatus } from "@/components/backend-status";
+import { MemoryToggle } from "@/features/assistant/memory-toggle";
 
 export function SiteHeader() {
   return (
@@ -13,6 +14,7 @@ export function SiteHeader() {
         </Link>
         <div className="flex items-center gap-3">
           <BackendStatus />
+          <MemoryToggle />
           <AccountMenu />
         </div>
       </div>

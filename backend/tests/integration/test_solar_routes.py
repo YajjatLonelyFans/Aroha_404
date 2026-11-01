@@ -84,14 +84,37 @@ def test_shade_lowers_generation(api):
     assert b["annual_kwh"]["median"] == pytest.approx(a["annual_kwh"]["median"] * 0.95, abs=1)
 
 
+@pytest.mark.parametrize("discom", ["BYPL", "TPDDL", "NDMC"])
+def test_every_delhi_discom_gets_savings(api, discom):
+    # One DERC domestic tariff schedule covers all four Delhi DISCOMs.
+    user_id = create_user(api.client, discom=discom)
+    property_id = create_property(api.client, user_id)
+    assessment_id = assess(api.client, user_id, property_id).json()["assessment_id"]
+    body = _estimate(api, user_id, assessment_id).json()
+    assert all(o["annual_savings_inr"]["likely"] is not None for o in body["options"])
+    assert all(o["payback_years"]["likely"] is not None for o in body["options"])
+
+
 def test_other_discom_has_no_savings_but_says_why(api):
-    user_id = create_user(api.client, discom="TPDDL")
+    user_id = create_user(api.client, discom="other")
     property_id = create_property(api.client, user_id)
     assessment_id = assess(api.client, user_id, property_id).json()["assessment_id"]
     body = _estimate(api, user_id, assessment_id).json()
     assert all(o["annual_savings_inr"]["likely"] is None for o in body["options"])
     assert all(o["gross_cost_inr"] is not None for o in body["options"])
-    assert any("TPDDL" in n for n in body["notes"])
+    assert any("DISCOM's tariff" in n for n in body["notes"])
+
+
+def test_low_use_is_raised_to_the_minimum_size(api):
+    # 80 units a month needs well under 1 kWp; a single 0.5 kW panel is not a practical system.
+    user_id = create_user(api.client, monthly_units_kwh=80)
+    property_id = create_property(api.client, user_id)
+    assessment_id = assess(api.client, user_id, property_id).json()["assessment_id"]
+    body = _estimate(api, user_id, assessment_id).json()
+    assert body["binding_constraint"] == "minimum"
+    assert body["recommended_kwp"] >= 1.0 and body["consumption_kwp"] < 1.0
+    assert all(o["capacity_kwp"] >= body["recommended_kwp"] for o in body["options"])
+    assert any("smaller systems are rarely installed" in n for n in body["notes"])
 
 
 def test_missing_cost_leaves_cost_empty_with_reason(api):

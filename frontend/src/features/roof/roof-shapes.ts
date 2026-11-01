@@ -50,3 +50,19 @@ export const kindLabel = (kind: NoGoKind) => NO_GO_KINDS.find((k) => k.value ===
 export function areaM2(polygon: Polygon): number {
   return turfArea(polygon);
 }
+
+const EARTH_RADIUS_M = 6_371_008.8;
+const SQ_FT_PER_M2 = 10.7639;
+
+/** Length of each side in metres (haversine), for the live readout; display only. */
+export function sideLengthsM(polygon: Polygon): number[] {
+  const ring = polygon.coordinates[0];
+  const rad = (d: number) => (d * Math.PI) / 180;
+  return ring.slice(1).map(([lon2, lat2], i) => {
+    const [lon1, lat1] = ring[i];
+    const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
+    return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a));
+  });
+}
+
+export const toSqFt = (m2: number) => m2 * SQ_FT_PER_M2;

@@ -709,6 +709,49 @@
         }
       }
     },
+    "/api/solar/estimates/{estimate_id}": {
+      "get": {
+        "tags": [
+          "solar"
+        ],
+        "summary": "Get Estimate",
+        "description": "A saved estimate, to show it again when the homeowner returns.",
+        "operationId": "get_estimate_api_solar_estimates__estimate_id__get",
+        "parameters": [
+          {
+            "name": "estimate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Estimate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolarEstimateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/policy/eligibility": {
       "post": {
         "tags": [
@@ -936,10 +979,197 @@
           }
         }
       }
+    },
+    "/api/assistant/logs": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Logs",
+        "description": "Recent chat turns for the agent log: agents, timings, and each Meko call, including the\nmemory saves made after the reply.",
+        "operationId": "logs_api_assistant_logs_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentLogsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AgentLogMemory": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryCallOut"
+            },
+            "type": "array",
+            "title": "Calls"
+          },
+          "commit_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MemoryCallOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "live",
+          "is_mock",
+          "error",
+          "calls",
+          "commit_calls"
+        ],
+        "title": "AgentLogMemory"
+      },
+      "AgentLogOut": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "agents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Agents"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "timings": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Timings"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/AgentLogMemory"
+          },
+          "llm": {
+            "$ref": "#/components/schemas/LLMInfo"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "created_at",
+          "agents",
+          "latency_ms",
+          "timings",
+          "memory",
+          "llm",
+          "is_mock"
+        ],
+        "title": "AgentLogOut"
+      },
+      "AgentLogsResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "logs": {
+            "items": {
+              "$ref": "#/components/schemas/AgentLogOut"
+            },
+            "type": "array",
+            "title": "Logs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "logs"
+        ],
+        "title": "AgentLogsResponse"
+      },
       "AgentOutput": {
         "properties": {
           "agent": {
@@ -1247,6 +1477,17 @@
             },
             "type": "array",
             "title": "Notes"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "timings": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Timings"
           }
         },
         "type": "object",
@@ -1257,7 +1498,9 @@
           "agent_outputs",
           "memory",
           "llm",
-          "notes"
+          "notes",
+          "latency_ms",
+          "timings"
         ],
         "title": "ChatResponse"
       },
@@ -1382,6 +1625,16 @@
             "type": "array",
             "title": "Season Notes"
           },
+          "seasons": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Seasons"
+          },
           "specific_yield": {
             "anyOf": [
               {
@@ -1449,6 +1702,7 @@
           "years",
           "monthly",
           "season_notes",
+          "seasons",
           "specific_yield",
           "units",
           "assumptions",
@@ -2501,6 +2755,41 @@
         ],
         "title": "MapConfig"
       },
+      "MemoryCallOut": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool",
+          "latency_ms",
+          "ok"
+        ],
+        "title": "MemoryCallOut",
+        "description": "One call to Meko, for the agent log: proof that memory is live."
+      },
       "MemoryCandidate": {
         "properties": {
           "agent": {
@@ -2585,6 +2874,13 @@
               }
             ],
             "title": "Error"
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryCallOut"
+            },
+            "type": "array",
+            "title": "Calls"
           }
         },
         "type": "object",
@@ -3506,7 +3802,8 @@
             "enum": [
               "roof",
               "consumption",
-              "limit"
+              "limit",
+              "minimum"
             ],
             "title": "Binding Constraint"
           },

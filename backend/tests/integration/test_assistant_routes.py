@@ -24,7 +24,7 @@ def test_memory_off_starts_fresh_and_asks_again(api):
     body = chat(api, user_id, "Hi, where was I?", meko=False)
     assert "don't have your home's details" in body["reply"]
     assert body["memory"] == {"enabled": False, "live": False, "is_mock": True, "recalled": 0, "shared": 0,
-                              "written": 0, "error": None}
+                              "written": 0, "error": None, "calls": []}
     assert body["llm"]["fallback_reason"] == "no_facts"
     assert api.llm.prompts == []  # no quota spent when there is nothing to explain
     assert api.memory.rows == []

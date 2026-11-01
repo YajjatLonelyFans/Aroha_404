@@ -1,0 +1,97 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { useMemoryEnabled } from "@/lib/memory-pref";
+import { useSession } from "@/lib/session";
+import { cn } from "@/lib/utils";
+
+import { AgentLog } from "./agent-log";
+import { ChatPanel } from "./chat-panel";
+import { MemoryToggle } from "./memory-toggle";
+
+/**
+ * "Ask Aroha": a chat drawer on every page once the homeowner has a profile, with an agent log tab.
+ * It lives in the root layout, so the conversation carries over as the person moves between pages.
+ */
+export function AssistantLauncher() {
+  const session = useSession();
+  const userId = session?.userId ?? null;
+  const [enabled] = useMemoryEnabled(userId);
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"chat" | "log">("chat");
+  const [replies, setReplies] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  if (!session || !userId) return null;
+
+  return (
+    <>
+      {!open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-5 right-5 z-40 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          Ask Aroha
+        </button>
+      )}
+      {/* Stays mounted while closed, so a reply that arrives after closing is not lost. */}
+      <aside
+          aria-label="Aroha assistant"
+          hidden={!open}
+          className={cn(
+            "fixed inset-y-0 right-0 z-50 w-full flex-col border-l border-border bg-card shadow-2xl sm:w-[420px]",
+            open ? "flex" : "hidden",
+          )}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg">Ask Aroha</h2>
+              <MemoryToggle />
+            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close the assistant"
+              className="rounded-md px-2 py-1 text-xl leading-none text-muted-foreground hover:bg-muted"
+            >
+              ×
+            </button>
+          </div>
+          <div role="tablist" aria-label="Assistant views" className="flex border-b border-border px-2">
+            {(["chat", "log"] as const).map((t) => (
+              <button
+                key={t}
+                role="tab"
+                type="button"
+                aria-selected={tab === t}
+                onClick={() => setTab(t)}
+                className={cn(
+                  "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
+                  tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t === "chat" ? "Chat" : "Agent log"}
+              </button>
+            ))}
+          </div>
+          {/* Both stay mounted so switching tabs keeps the conversation and the log. */}
+          <div className={cn("min-h-0 flex-1 flex-col", tab === "chat" ? "flex" : "hidden")}>
+            <ChatPanel key={userId} userId={userId} memoryEnabled={enabled} onReply={() => setReplies((n) => n + 1)} />
+          </div>
+          <div className={cn("min-h-0 flex-1 flex-col", tab === "log" ? "flex" : "hidden")}>
+            {open && tab === "log" && <AgentLog userId={userId} refreshKey={replies} />}
+          </div>
+        </aside>
+    </>
+  );
+}

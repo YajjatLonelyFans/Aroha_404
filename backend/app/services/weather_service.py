@@ -306,6 +306,7 @@ class WeatherService:
                 for m in doc["monthly"]
             ],
             season_notes=notes_out,
+            seasons=self._a.seasons,
             specific_yield=yield_out,
             units=doc["units"],
             assumptions=[

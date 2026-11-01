@@ -65,6 +65,8 @@ class Capacity(_Section):
     shading_haircut_fraction: float | None = None
     small_area_m2: float | None = None
     many_obstructions_fraction: float | None = None
+    large_outline_m2: float | None = None  # warn above this: may cover more than one roof
+    min_recommended_kwp: float | None = None  # smallest size worth recommending
     source: str | None = None
 
 
@@ -93,7 +95,7 @@ class TariffSlab(_Section):
 
 
 class Tariff(_Section):
-    discom: str
+    discoms: list[str]  # DISCOMs these slabs apply to (one DERC schedule covers all four in Delhi)
     slabs: list[TariffSlab] = Field(default_factory=list)
     fixed_charges_inr: float | None = None
     export_rate_inr: float | None = None

@@ -111,6 +111,32 @@ def test_size_limited_by_cap():
     assert r.binding_constraint == "limit"
 
 
+def test_size_raised_to_minimum_for_low_use():
+    r = recommend_size(roof_panel_count=20, module_wp=550, annual_consumption_kwh=960,
+                       annual_yield_kwh_per_kwp=1490, min_kwp=1.0)
+    assert r.consumption_kwp == pytest.approx(0.644, abs=0.001)
+    assert r.panel_count == 2 and r.recommended_kwp == 1.1
+    assert r.binding_constraint == "minimum"
+
+
+def test_minimum_never_exceeds_the_roof():
+    r = recommend_size(roof_panel_count=1, module_wp=550, annual_consumption_kwh=500,
+                       annual_yield_kwh_per_kwp=1490, min_kwp=1.0)
+    assert r.panel_count == 1 and r.binding_constraint == "roof"
+
+
+def test_minimum_never_exceeds_a_limit():
+    r = recommend_size(roof_panel_count=20, module_wp=550, annual_consumption_kwh=500,
+                       annual_yield_kwh_per_kwp=1490, limit_kwp=0.6, min_kwp=1.0)
+    assert r.panel_count == 1 and r.binding_constraint == "limit"
+
+
+def test_minimum_does_not_touch_normal_use():
+    r = recommend_size(roof_panel_count=20, module_wp=500, annual_consumption_kwh=4200,
+                       annual_yield_kwh_per_kwp=1400, min_kwp=1.0)
+    assert r.panel_count == 6 and r.binding_constraint == "consumption"
+
+
 def test_size_needs_positive_yield():
     with pytest.raises(DomainError):
         recommend_size(roof_panel_count=10, module_wp=500, annual_consumption_kwh=4200,

@@ -18,17 +18,19 @@ export function RoofResult({ result }: { result: Assessment }) {
     <div className="flex flex-col gap-5">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-2xl tabular-nums">About {formatNumber(result.panel_count)} panels</h2>
+          <h2 className="text-2xl tabular-nums">Up to {formatNumber(result.panel_count)} panels fit</h2>
           <span className={cn("rounded-full border px-2 py-0.5 text-xs font-medium", confidence.className)}>
             {confidence.label}
           </span>
         </div>
         <p className="mt-1 tabular-nums">
-          {min === max ? `${formatKwp(likely)} of panels` : `${formatKwpRange(min, max)} of panels, most likely ${formatKwp(likely)}`}
+          {min === max
+            ? `${formatKwp(likely)} at most on this roof`
+            : `${formatKwpRange(min, max)} at most on this roof, most likely ${formatKwp(likely)}`}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {formatNumber(result.module_wp)} W panels{result.traced ? ", drawn on the map" : ""}. This is an estimate, not a
-          final design.
+          This is what the roof can hold, not a recommendation. The estimate sizes the system to your electricity use,
+          which is often smaller. {formatNumber(result.module_wp)} W panels{result.traced ? ", drawn on the map" : ""}.
         </p>
       </div>
 

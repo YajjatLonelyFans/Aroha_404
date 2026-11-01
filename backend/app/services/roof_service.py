@@ -102,6 +102,7 @@ class RoofService:
                 shading_haircut_fraction=a.require("capacity.shading_haircut_fraction"),
                 small_area_m2=a.require("capacity.small_area_m2"),
                 many_obstructions_fraction=a.require("capacity.many_obstructions_fraction"),
+                large_outline_m2=a.require("capacity.large_outline_m2"),
             ),
         )
 

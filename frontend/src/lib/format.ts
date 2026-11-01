@@ -28,12 +28,18 @@ export function formatKwh(n: Num): string {
   return isNum(n) ? `${formatNumber(n)} kWh` : MISSING;
 }
 
+/** System size: panels come in steps like 0.55 kW, so keep up to 2 decimals ("2.75", "3.3", "16.0"). */
+export function formatKwpNumber(n: Num): string {
+  if (!isNum(n)) return MISSING;
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
+
 export function formatKwp(n: Num): string {
-  return isNum(n) ? `${formatNumber(n, 1)} kWp` : MISSING;
+  return isNum(n) ? `${formatKwpNumber(n)} kWp` : MISSING;
 }
 
 export function formatKwpRange(lo: Num, hi: Num): string {
-  return isNum(lo) && isNum(hi) && lo !== hi ? `${formatNumber(lo, 1)}–${formatNumber(hi, 1)} kWp` : formatKwp(lo ?? hi);
+  return isNum(lo) && isNum(hi) && lo !== hi ? `${formatKwpNumber(lo)}–${formatKwpNumber(hi)} kWp` : formatKwp(lo ?? hi);
 }
 
 export function formatArea(m2: Num): string {
@@ -73,4 +79,10 @@ export function formatDateTime(iso: string | null | undefined): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+/** "4,100–4,900 kWh". */
+export function formatKwhRange(lo: Num, hi: Num): string {
+  const r = formatRange(lo, hi, (n) => formatNumber(n));
+  return r === MISSING ? r : `${r} kWh`;
 }

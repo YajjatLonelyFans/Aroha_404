@@ -62,7 +62,7 @@ class SolarEstimateResponse(BaseModel):
     monthly_units_kwh: float
     options: list[EstimateOption]
     recommended_kwp: float
-    binding_constraint: Literal["roof", "consumption", "limit"]
+    binding_constraint: Literal["roof", "consumption", "limit", "minimum"]
     roof_kwp: float
     consumption_kwp: float
     shading_loss_fraction: float
