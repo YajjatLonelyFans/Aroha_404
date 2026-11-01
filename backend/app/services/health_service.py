@@ -16,6 +16,7 @@ from app.core.settings import Settings, is_configured
 from app.db.client import ping
 from app.integrations.llm.gemini import GEMINI_URL
 from app.integrations.meko.base import MemoryProvider, MemoryUnavailable
+from app.integrations.tiles.factory import tile_source
 from app.schemas.health import AssumptionsStatus, DependencyStatus, HealthResponse
 
 PROBE_TIMEOUT_S = 10.0
@@ -50,6 +51,14 @@ def _config_status(*values: str, hint: str, is_mock: bool) -> DependencyStatus:
     if all(is_configured(v) for v in values):
         return DependencyStatus(status="configured", detail="Add ?deep=true to check live")
     return DependencyStatus(status="not_configured", detail=hint)
+
+
+def _imagery_status(settings: Settings) -> DependencyStatus:
+    source = tile_source(settings)
+    if source is None and not settings.use_mock_tiles:
+        return DependencyStatus(status="not_configured", detail="MAP_TILES_PROVIDER must be 'maptiler' or 'esri'")
+    return _config_status(source.api_key if source else "", is_mock=settings.use_mock_tiles,
+                          hint=f"Set {source.key_env} for satellite imagery" if source else "")
 
 
 async def _open_meteo_status(settings: Settings, deep: bool) -> DependencyStatus:
@@ -110,6 +119,7 @@ async def check_health(
             hint="Set NOMINATIM_USER_AGENT (app name and contact email)",
             is_mock=settings.use_mock_geocoding,
         ),
+        "satellite_imagery": _imagery_status(settings),
         "meko": meko_s,
         "llm": llm_s,
     }

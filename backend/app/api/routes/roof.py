@@ -13,3 +13,11 @@ router = APIRouter(prefix="/roof", tags=["roof"])
 async def assess(body: RoofAssessRequest, svc: Annotated[RoofService, Depends(get_roof_service)]) -> RoofAssessResponse:
     """Outline, no-go areas and shading → usable area, panel layout and capacity range."""
     return await svc.assess(body)
+
+
+@router.get("/assessments/{assessment_id}", response_model=RoofAssessResponse)
+async def get_assessment(
+    assessment_id: str, svc: Annotated[RoofService, Depends(get_roof_service)]
+) -> RoofAssessResponse:
+    """A saved assessment, to show the panels and numbers again when the homeowner returns."""
+    return await svc.get(assessment_id)

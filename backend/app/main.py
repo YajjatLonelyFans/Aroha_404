@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import PyMongoError
 
 from app import __version__
-from app.api.routes import applications, assistant, geo, health, policy, roof, solar, users, weather
+from app.api.routes import applications, assistant, geo, health, map, policy, roof, solar, users, weather
 from app.core.assumptions import load_assumptions
 from app.core.errors import UnexpectedErrorMiddleware, register_error_handlers
 from app.core.logging import setup_logging
@@ -29,6 +29,7 @@ from app.integrations.llm.gemini import GeminiProvider
 from app.integrations.llm.mock import MockLLM
 from app.integrations.meko.mcp_client import MekoMcpProvider
 from app.integrations.meko.mock import MockMemoryProvider
+from app.integrations.tiles.factory import build_tile_provider
 from app.integrations.weather.mock import MockWeatherProvider
 from app.integrations.weather.open_meteo import OpenMeteoProvider
 
@@ -80,6 +81,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             log.warning("NOMINATIM_USER_AGENT is not set; address search is off (pins still work)")
             app.state.geocoder = UnconfiguredGeocoder()
 
+        app.state.tiles = build_tile_provider(settings, app.state.http)
+
         app.state.llm = None
         if settings.use_mock_llm:
             log.warning("USE_MOCK_LLM is on: chat replies come from a labelled mock")
@@ -128,7 +131,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(TimingMiddleware)
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api")
-    for module in (users, geo, roof, weather, solar, policy, applications, assistant):
+    for module in (users, geo, map, roof, weather, solar, policy, applications, assistant):
         app.include_router(module.router, prefix="/api")
     return app
 
@@ -153,8 +156,10 @@ class TimingMiddleware:
             if message["type"] == "http.response.start":
                 ms = round(1000 * (time.perf_counter() - start))
                 message.setdefault("headers", []).append((b"x-response-time-ms", str(ms).encode()))
-                if scope["path"].startswith("/api"):
-                    log.info("%s %s -> %d in %d ms", scope["method"], scope["path"], message["status"], ms)
+                path = scope["path"]
+                # A map view loads dozens of tiles; log only the ones that fail.
+                if path.startswith("/api") and (not path.startswith("/api/tiles/") or message["status"] >= 400):
+                    log.info("%s %s -> %d in %d ms", scope["method"], path, message["status"], ms)
             await send(message)
 
         await self.app(scope, receive, send_with_timing)

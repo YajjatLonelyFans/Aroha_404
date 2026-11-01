@@ -7,6 +7,11 @@ export type Schemas = components["schemas"];
 // NEXT_PUBLIC_API_BASE_URL may end in /api; the generated paths already start with /api.
 const ORIGIN = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(/\/+$/, "").replace(/\/api$/, "");
 
+/** Absolute URL for a path on the Aroha API, e.g. a tile template from /api/map/config. */
+export function apiUrl(path: string): string {
+  return `${ORIGIN}${path}`;
+}
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 type Method = "get" | "post" | "patch";

@@ -12,6 +12,8 @@ from app.schemas.user import (
     CreatePropertyRequest,
     CreatePropertyResponse,
     CreateUserRequest,
+    PropertyOut,
+    SavedRoof,
     CreateUserResponse,
     LatestIds,
     UserSummary,
@@ -108,3 +110,20 @@ class UserService:
             "updated_at": now,
         })
         return CreatePropertyResponse(property_id=property_id, grid_key=gk, lat=req.lat, lon=req.lon)
+
+    async def get_property(self, property_id: str) -> PropertyOut:
+        doc = await self._store.get(c.PROPERTIES, property_id)
+        if doc is None:
+            raise NotFoundError("Property")
+        lon, lat = doc["pin"]["coordinates"]
+        return PropertyOut(
+            property_id=doc["id"],
+            user_id=doc["user_id"],
+            lat=lat,
+            lon=lon,
+            grid_key=doc["grid_key"],
+            address_text=doc.get("address_text"),
+            created_at=doc["created_at"],
+            roof=SavedRoof(**{k: doc.get(k) for k in SavedRoof.model_fields if doc.get(k) is not None})
+            if doc.get("roof_type") else None,
+        )

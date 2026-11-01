@@ -81,6 +81,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/properties/{property_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Property
+         * @description A saved map pin, for showing it again when the homeowner returns.
+         */
+        get: operations["get_property_api_properties__property_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/geo/search": {
         parameters: {
             query?: never;
@@ -93,6 +113,46 @@ export interface paths {
          * @description Address search within Delhi. Call on Enter or after a pause, not on every keystroke.
          */
         get: operations["search_api_geo_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/map/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Map Config
+         * @description What the map needs: the tile URL on this API, the credit line to show, and the zoom limit.
+         */
+        get: operations["map_config_api_map_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tiles/satellite/{z}/{x}/{y}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Satellite Tile
+         * @description One satellite tile, fetched from the provider with the backend's key.
+         */
+        get: operations["satellite_tile_api_tiles_satellite__z___x___y__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -115,6 +175,26 @@ export interface paths {
          * @description Outline, no-go areas and shading → usable area, panel layout and capacity range.
          */
         post: operations["assess_api_roof_assess_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roof/assessments/{assessment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Assessment
+         * @description A saved assessment, to show the panels and numbers again when the homeowner returns.
+         */
+        get: operations["get_assessment_api_roof_assessments__assessment_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -766,6 +846,24 @@ export interface components {
             /** No Go Areas M2 */
             no_go_areas_m2?: number[];
         };
+        /** MapConfig */
+        MapConfig: {
+            /** Satellite Available */
+            satellite_available: boolean;
+            /**
+             * Tile Url
+             * @description XYZ template on this API, relative to its origin
+             */
+            tile_url: string;
+            /** Attribution */
+            attribution: string;
+            /** Max Zoom */
+            max_zoom: number;
+            /** Is Mock */
+            is_mock: boolean;
+            /** Detail */
+            detail?: string | null;
+        };
         /**
          * MemoryCandidate
          * @description A summary an agent proposes to remember. Only the orchestrator commits it.
@@ -871,6 +969,28 @@ export interface components {
             /** Type */
             type: string | null;
         };
+        /** PropertyOut */
+        PropertyOut: {
+            /** Property Id */
+            property_id: string;
+            /** User Id */
+            user_id: string;
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
+            /** Grid Key */
+            grid_key: string;
+            /** Address Text */
+            address_text: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** @description Null until a roof has been assessed for this pin */
+            roof?: components["schemas"]["SavedRoof"] | null;
+        };
         /** Range */
         Range: {
             /** Low */
@@ -964,6 +1084,32 @@ export interface components {
             assumptions_version: string;
             /** Model Version */
             model_version: string;
+        };
+        /**
+         * SavedRoof
+         * @description What the homeowner last drew and answered, so the map can show it again.
+         */
+        SavedRoof: {
+            /**
+             * Outline
+             * @description GeoJSON Polygon (WGS84)
+             */
+            outline?: {
+                [key: string]: unknown;
+            } | null;
+            /** No Go Areas */
+            no_go_areas?: components["schemas"]["NoGoArea"][];
+            manual_dimensions?: components["schemas"]["ManualDimensions"] | null;
+            /**
+             * Roof Type
+             * @enum {string}
+             */
+            roof_type: "flat" | "sloped";
+            /** Slope Tilt Deg */
+            slope_tilt_deg?: number | null;
+            /** Slope Azimuth Deg */
+            slope_azimuth_deg?: number | null;
+            shading?: components["schemas"]["Shading"];
         };
         /** SchemeResult */
         SchemeResult: {
@@ -1358,6 +1504,37 @@ export interface operations {
             };
         };
     };
+    get_property_api_properties__property_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                property_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_api_geo_search_get: {
         parameters: {
             query: {
@@ -1390,6 +1567,60 @@ export interface operations {
             };
         };
     };
+    map_config_api_map_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapConfig"];
+                };
+            };
+        };
+    };
+    satellite_tile_api_tiles_satellite__z___x___y__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                z: number;
+                x: number;
+                y: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "image/png": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     assess_api_roof_assess_post: {
         parameters: {
             query?: never;
@@ -1405,6 +1636,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoofAssessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_assessment_api_roof_assessments__assessment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

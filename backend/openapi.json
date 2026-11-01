@@ -177,6 +177,49 @@
         }
       }
     },
+    "/api/properties/{property_id}": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get Property",
+        "description": "A saved map pin, for showing it again when the homeowner returns.",
+        "operationId": "get_property_api_properties__property_id__get",
+        "parameters": [
+          {
+            "name": "property_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Property Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/geo/search": {
       "get": {
         "tags": [
@@ -224,6 +267,90 @@
         }
       }
     },
+    "/api/map/config": {
+      "get": {
+        "tags": [
+          "map"
+        ],
+        "summary": "Map Config",
+        "description": "What the map needs: the tile URL on this API, the credit line to show, and the zoom limit.",
+        "operationId": "map_config_api_map_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tiles/satellite/{z}/{x}/{y}": {
+      "get": {
+        "tags": [
+          "map"
+        ],
+        "summary": "Satellite Tile",
+        "description": "One satellite tile, fetched from the provider with the backend's key.",
+        "operationId": "satellite_tile_api_tiles_satellite__z___x___y__get",
+        "parameters": [
+          {
+            "name": "z",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 22,
+              "minimum": 0,
+              "title": "Z"
+            }
+          },
+          {
+            "name": "x",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "X"
+            }
+          },
+          {
+            "name": "y",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Y"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/jpeg": {},
+              "image/png": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/roof/assess": {
       "post": {
         "tags": [
@@ -244,6 +371,49 @@
         },
         "responses": {
           "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoofAssessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/roof/assessments/{assessment_id}": {
+      "get": {
+        "tags": [
+          "roof"
+        ],
+        "summary": "Get Assessment",
+        "description": "A saved assessment, to show the panels and numbers again when the homeowner returns.",
+        "operationId": "get_assessment_api_roof_assessments__assessment_id__get",
+        "parameters": [
+          {
+            "name": "assessment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assessment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -2286,6 +2456,51 @@
         "title": "ManualDimensions",
         "description": "Fallback when the map cannot be used: a rectangle plus no-go areas by size."
       },
+      "MapConfig": {
+        "properties": {
+          "satellite_available": {
+            "type": "boolean",
+            "title": "Satellite Available"
+          },
+          "tile_url": {
+            "type": "string",
+            "title": "Tile Url",
+            "description": "XYZ template on this API, relative to its origin"
+          },
+          "attribution": {
+            "type": "string",
+            "title": "Attribution"
+          },
+          "max_zoom": {
+            "type": "integer",
+            "title": "Max Zoom"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "satellite_available",
+          "tile_url",
+          "attribution",
+          "max_zoom",
+          "is_mock"
+        ],
+        "title": "MapConfig"
+      },
       "MemoryCandidate": {
         "properties": {
           "agent": {
@@ -2587,6 +2802,68 @@
         ],
         "title": "PlaceOut"
       },
+      "PropertyOut": {
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "title": "Property Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "grid_key": {
+            "type": "string",
+            "title": "Grid Key"
+          },
+          "address_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Text"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "roof": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SavedRoof"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until a roof has been assessed for this pin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property_id",
+          "user_id",
+          "lat",
+          "lon",
+          "grid_key",
+          "address_text",
+          "created_at"
+        ],
+        "title": "PropertyOut"
+      },
       "Range": {
         "properties": {
           "low": {
@@ -2868,6 +3145,79 @@
           "model_version"
         ],
         "title": "RoofAssessResponse"
+      },
+      "SavedRoof": {
+        "properties": {
+          "outline": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outline",
+            "description": "GeoJSON Polygon (WGS84)"
+          },
+          "no_go_areas": {
+            "items": {
+              "$ref": "#/components/schemas/NoGoArea"
+            },
+            "type": "array",
+            "title": "No Go Areas"
+          },
+          "manual_dimensions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManualDimensions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "roof_type": {
+            "type": "string",
+            "enum": [
+              "flat",
+              "sloped"
+            ],
+            "title": "Roof Type"
+          },
+          "slope_tilt_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Tilt Deg"
+          },
+          "slope_azimuth_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Azimuth Deg"
+          },
+          "shading": {
+            "$ref": "#/components/schemas/Shading"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roof_type"
+        ],
+        "title": "SavedRoof",
+        "description": "What the homeowner last drew and answered, so the map can show it again."
       },
       "SchemeResult": {
         "properties": {

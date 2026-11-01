@@ -48,6 +48,22 @@ class Settings(BaseSettings):
     chat_max_per_minute: int = 6  # per user; protects the free LLM quota
     chat_max_total_per_minute: int = 30  # all users together
 
+    # Satellite tiles are fetched by the backend so the key never reaches the browser.
+    map_tiles_provider: str = "maptiler"  # "maptiler" or "esri"
+    maptiler_api_key: str = ""
+    maptiler_tile_url: str = "https://api.maptiler.com/maps/satellite/256/{z}/{x}/{y}.jpg"
+    # From MapTiler's satellite TileJSON (checked live 1 Nov 2026); the map renders it as HTML.
+    maptiler_attribution: str = (
+        '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> '
+        '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>'
+    )
+    esri_api_key: str = ""
+    esri_imagery_tile_url: str = (
+        "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    )
+    # Credit line from the World Imagery item's "Credits (Attribution)"; re-check before the demo.
+    esri_imagery_attribution: str = "Esri, Vantor, Earthstar Geographics, and the GIS User Community"
+
     llm_provider: str = ""
     llm_api_key: str = ""
     llm_model: str = ""
@@ -56,6 +72,7 @@ class Settings(BaseSettings):
     use_mock_geocoding: bool = False
     use_mock_meko: bool = False
     use_mock_llm: bool = False
+    use_mock_tiles: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:

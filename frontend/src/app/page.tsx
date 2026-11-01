@@ -1,4 +1,7 @@
 import Image from "next/image";
+import Link from "next/link";
+
+import { buttonClass } from "@/components/ui/button";
 
 // Placeholder landing page for F1; replaced when the screen designs arrive.
 export default function Home() {
@@ -11,6 +14,9 @@ export default function Home() {
         Aroha checks your roof, estimates what panels could generate from ten years of weather data, works out
         cost, subsidy and payback, and walks you through the application.
       </p>
+      <Link href="/start" className={buttonClass("primary", "mt-2")}>
+        Check my roof
+      </Link>
     </section>
   );
 }

@@ -162,14 +162,24 @@ class RoofService:
             "updated_at": now,
         })
 
-        return RoofAssessResponse(
-            assessment_id=assessment_id,
-            **{k: doc[k] for k in (
-                "property_id", "outline_area_m2", "setback_area_m2", "no_go_area_m2", "usable_area_m2",
-                "panel_layout", "panel_count", "module_wp", "array_tilt_deg", "array_azimuth_deg",
-                "orientation", "row_gap_m", "shading_loss_fraction", "assumptions", "confidence", "traced",
-                "assumptions_version", "model_version",
-            )},
-            capacity_kwp=KwpRange(**doc["capacity_kwp"]),
-            constraints=[ConstraintOut(**x) for x in doc["constraints"]],
-        )
+        return _response(assessment_id, doc)
+
+    async def get(self, assessment_id: str) -> RoofAssessResponse:
+        doc = await self._store.get(c.ROOF_ASSESSMENTS, assessment_id)
+        if doc is None:
+            raise NotFoundError("Roof assessment")
+        return _response(assessment_id, doc)
+
+
+def _response(assessment_id: str, doc: dict[str, Any]) -> RoofAssessResponse:
+    return RoofAssessResponse(
+        assessment_id=assessment_id,
+        **{k: doc[k] for k in (
+            "property_id", "outline_area_m2", "setback_area_m2", "no_go_area_m2", "usable_area_m2",
+            "panel_layout", "panel_count", "module_wp", "array_tilt_deg", "array_azimuth_deg",
+            "orientation", "row_gap_m", "shading_loss_fraction", "assumptions", "confidence", "traced",
+            "assumptions_version", "model_version",
+        )},
+        capacity_kwp=KwpRange(**doc["capacity_kwp"]),
+        constraints=[ConstraintOut(**x) for x in doc["constraints"]],
+    )

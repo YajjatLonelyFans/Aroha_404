@@ -5,6 +5,15 @@ import { useEffect, useState } from "react";
 import { MockBadge } from "@/components/mock-badge";
 import { api, type Schemas } from "@/lib/api";
 
+// Plain names for the dependency keys in /api/health.
+const LABELS: Record<string, string> = {
+  open_meteo: "weather",
+  nominatim: "address search",
+  satellite_imagery: "imagery",
+  meko: "memory",
+  llm: "assistant",
+};
+
 type State = { kind: "loading" } | { kind: "offline" } | { kind: "ok"; health: Schemas["HealthResponse"] };
 
 /** Header pill: is the backend up, and which dependencies are mocks. */
@@ -25,7 +34,9 @@ export function BackendStatus() {
   if (state.kind === "offline") {
     return <Pill className="border-danger text-danger">Server offline</Pill>;
   }
-  const mocks = Object.entries(state.health.dependencies).filter(([, d]) => d.is_mock).map(([name]) => name);
+  const mocks = Object.entries(state.health.dependencies)
+    .filter(([, d]) => d.is_mock)
+    .map(([name]) => LABELS[name] ?? name);
   return (
     <div className="flex flex-wrap items-center gap-2">
       {state.health.status === "degraded" && <Pill className="border-warning text-warning">Some services limited</Pill>}
@@ -37,5 +48,5 @@ export function BackendStatus() {
 }
 
 function Pill({ className, children }: { className: string; children: React.ReactNode }) {
-  return <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}>{children}</span>;
+  return <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}>{children}</span>;
 }

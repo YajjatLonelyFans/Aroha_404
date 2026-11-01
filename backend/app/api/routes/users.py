@@ -8,6 +8,7 @@ from app.schemas.user import (
     CreatePropertyResponse,
     CreateUserRequest,
     CreateUserResponse,
+    PropertyOut,
     UserSummary,
 )
 from app.services.user_service import UserService
@@ -32,3 +33,9 @@ async def get_user(user_id: str, svc: Service) -> UserSummary:
 async def create_property(body: CreatePropertyRequest, svc: Service) -> CreatePropertyResponse:
     """Save the map pin for the house."""
     return await svc.create_property(body)
+
+
+@router.get("/properties/{property_id}", response_model=PropertyOut)
+async def get_property(property_id: str, svc: Service) -> PropertyOut:
+    """A saved map pin, for showing it again when the homeowner returns."""
+    return await svc.get_property(property_id)
