@@ -102,8 +102,13 @@ class Orchestrator:
                 mem.live = any(call["ok"] for call in calls) and not self._memory.is_mock
                 mem.recalled, mem.shared = len(recalled), len(shared)
                 if timed_out:
-                    notes.append("Memory recall was slow, so earlier notes were skipped this turn; "
-                                 "your saved records were still used.")
+                    notes.append(
+                        "Memory recall was slow, so some earlier notes were skipped this turn; "
+                        "your saved records were still used."
+                        if recalled or shared else
+                        "Memory recall was slow, so earlier notes were skipped this turn; "
+                        "your saved records were still used."
+                    )
             except MemoryUnavailable as exc:
                 use_memory, mem.error, records = False, exc.message, {}
                 notes.append("Memory is unavailable right now, so this chat starts fresh.")
@@ -137,7 +142,7 @@ class Orchestrator:
             "latency_ms": latency_ms,
             "timings": timings,
             "meko": {"enabled": req.meko_enabled, "live": mem.live, "is_mock": mem.is_mock,
-                     "error": mem.error, "calls": meko_calls},
+                     "error": mem.error, "calls": meko_calls, "written": mem.written},
             "llm": llm_info.model_dump(),
             "is_mock": mem.is_mock or llm_info.is_mock,
             "created_at": self._clock(),
@@ -161,28 +166,52 @@ class Orchestrator:
     ) -> tuple[str | None, list[MemoryHit], list[MemoryHit], list[dict], bool]:
         """(conversation id, recalled, shared lessons, calls, timed out). Raises MemoryUnavailable.
 
-        The whole recall (connect, conversation, searches) shares one time budget. Past it the
-        turn goes on with the saved records; the conversation id is kept when already known."""
+        The whole recall (connect, conversation, searches) shares one time budget. Each agent's
+        search runs on its own, and whatever has finished by the deadline is kept: one slow search
+        no longer throws away the others (a greeting searches all five agents at once). The turn
+        goes on with the saved records; the conversation id is kept when already known."""
         conversation_id: str | None = user.get("meko_conversation_id")
         recalled: list[MemoryHit] = []
         shared: list[MemoryHit] = []
         calls: list[dict] = []
         timed_out = False
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._recall_timeout_s
         try:
-            async with asyncio.timeout(self._recall_timeout_s):
+            async with asyncio.timeout_at(deadline):
                 async with self._memory.session() as ms:
                     try:
                         conversation_id = await ms.ensure_conversation(req.user_id, conversation_id)
                         if conversation_id != user.get("meko_conversation_id"):
                             await self._store.update(c.USERS, req.user_id, {"meko_conversation_id": conversation_id})
-                        searches = [ms.search(conversation_id, f"{req.message} ({'; '.join(RECALL_TOPICS[a] for a in agents)})",
-                                              [agent_key(a) for a in agents], k=3)]
+                        query = f"{req.message} ({'; '.join(RECALL_TOPICS[a] for a in agents)})"
+                        tasks: dict[asyncio.Task, str] = {
+                            asyncio.create_task(ms.search(conversation_id, query, [agent_key(a)], k=3)): "recall"
+                            for a in agents
+                        }
                         if {"policy", "application"} & set(agents):
                             # Promoted lessons from the shared knowledge base, searched alongside recall.
-                            searches.append(self._shared_lessons(ms, conversation_id, f"{req.message} ({SHARED_TOPIC})"))
-                        found = await asyncio.gather(*searches)
-                        recalled = found[0]
-                        shared = found[1] if len(found) > 1 else []
+                            tasks[asyncio.create_task(
+                                self._shared_lessons(ms, conversation_id, f"{req.message} ({SHARED_TOPIC})")
+                            )] = "shared"
+                        # Stop just before the outer deadline so the finished searches can be kept.
+                        done, pending = await asyncio.wait(tasks, timeout=max(0.0, deadline - loop.time() - 0.05))
+                        for task in pending:
+                            task.cancel()
+                        if pending:
+                            timed_out = True
+                            await asyncio.gather(*pending, return_exceptions=True)
+                        errors = [t.exception() for t in done if t.exception() is not None]
+                        if errors and len(errors) == len(tasks):
+                            raise errors[0]  # every search failed: memory is unavailable
+                        for task in done:
+                            if task.exception() is not None:
+                                continue
+                            if tasks[task] == "recall":
+                                recalled += task.result()
+                            else:
+                                shared = task.result()
+                        recalled.sort(key=lambda h: -(h.score or 0))
                     finally:
                         calls = [call.__dict__ for call in ms.calls]
         except TimeoutError:

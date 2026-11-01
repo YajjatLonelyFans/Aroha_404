@@ -66,7 +66,7 @@ def test_no_duplicates_even_when_recall_misses(api):
     api.memory.rows.extend(stored)
 
 
-def test_recall_is_one_search_with_every_agents_topic(api):
+def test_recall_searches_each_agent_with_every_agents_topic(api):
     user_id = ready_user(api)
     seen = {}
     original = api.memory.session
@@ -91,9 +91,13 @@ def test_recall_is_one_search_with_every_agents_topic(api):
 
     api.memory.session = spying_session
     chat(api, user_id, "Hi, where was I?")
-    assert len(seen["calls"]) == 1
-    query, agent_ids = seen["calls"][0]
-    assert agent_ids == ["aroha:roof", "aroha:weather", "aroha:financial", "aroha:policy", "aroha:application"]
+    # One search per agent, run separately so a slow one cannot sink the rest; same query for all.
+    assert sorted(ids[0] for _, ids in seen["calls"]) == sorted(
+        ["aroha:roof", "aroha:weather", "aroha:financial", "aroha:policy", "aroha:application"])
+    assert all(len(ids) == 1 for _, ids in seen["calls"])
+    queries = {q for q, _ in seen["calls"]}
+    assert len(queries) == 1
+    query = queries.pop()
     assert query.startswith("Hi, where was I?") and "usable area" in query and "payback" in query
 
 
@@ -167,7 +171,7 @@ def test_run_is_logged_with_memory_calls(api):
     log = logs[0]
     assert log["agents"] == ["roof", "weather", "financial", "policy", "application"]
     assert sorted(c["tool"] for c in log["meko"]["calls"]) == [
-        "mock.conversation_create", "mock.knowledgebase_search", "mock.memory_search"]
+        "mock.conversation_create", "mock.knowledgebase_search"] + ["mock.memory_search"] * 5
     assert [c["tool"] for c in log["meko_commit_calls"]] == ["mock.memory_add"] * 4
     assert log["llm"]["model"] == "fake-llm"
 

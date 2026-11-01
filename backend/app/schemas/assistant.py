@@ -58,6 +58,7 @@ class AgentLogMemory(BaseModel):
     error: str | None
     calls: list[MemoryCallOut]
     commit_calls: list[MemoryCallOut] | None  # saved after the reply; null until the save has run
+    written: int | None = None  # notes queued for saving; 0 means nothing to save (null on older logs)
 
 
 class AgentLogOut(BaseModel):

@@ -19,11 +19,11 @@
             "required": false,
             "schema": {
               "type": "boolean",
-              "description": "Also call Open-Meteo, Gemini (model lookup) and Meko once each",
+              "description": "Also call Open-Meteo, Nominatim, the imagery provider, Gemini (model lookup) and Meko once each",
               "default": false,
               "title": "Deep"
             },
-            "description": "Also call Open-Meteo, Gemini (model lookup) and Meko once each"
+            "description": "Also call Open-Meteo, Nominatim, the imagery provider, Gemini (model lookup) and Meko once each"
           }
         ],
         "responses": {
@@ -1083,6 +1083,17 @@
               }
             ],
             "title": "Commit Calls"
+          },
+          "written": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Written"
           }
         },
         "type": "object",

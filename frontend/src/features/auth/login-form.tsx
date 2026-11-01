@@ -6,7 +6,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
-import { signIn, useSession } from "@/lib/session";
+import { ApiError, api } from "@/lib/api";
+import { resumeHomeowner, signIn, useSession } from "@/lib/session";
 import { checkEmail, checkPassword, checkUsername } from "@/lib/validation";
 
 type Values = { email: string; username: string; password: string };
@@ -63,18 +64,63 @@ export function LoginForm({ redirectTo = "/start" }: { redirectTo?: string | nul
       </p>
       <form className="mt-6 flex flex-col gap-4" onSubmit={submit} noValidate>
         <Field label="Email" type="email" autoComplete="email" inputMode="email" {...field("email")} />
-        <Field label="Username" autoComplete="username" hint="3–20 letters, numbers, dots or underscores." {...field("username")} />
+        <Field label="Username" autoComplete="username" hint="3–20 letters, numbers, dots or underscores" {...field("username")} />
         <Field
           label="Password"
           type="password"
           autoComplete="current-password"
-          hint="At least 8 characters, with a letter and a number."
+          hint="At least 8 characters, with a letter and a number"
           {...field("password")}
         />
         <Button type="submit" className="mt-2">
           Continue
         </Button>
       </form>
+      <ResumeHomeowner />
     </Card>
+  );
+}
+
+const HOMEOWNER_ID = /^[a-f0-9]{24}$/;
+
+/** For the demo: continue as a homeowner seeded earlier (scripts/seed_demo.py prints the ID). */
+function ResumeHomeowner() {
+  const [id, setId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function resume(e: FormEvent) {
+    e.preventDefault();
+    const userId = id.trim().toLowerCase();
+    if (!HOMEOWNER_ID.test(userId)) return setError("A homeowner ID is 24 letters and numbers (a–f, 0–9).");
+    setBusy(true);
+    setError(null);
+    try {
+      const user = await api("get", "/api/users/{user_id}", { path: { user_id: userId } });
+      resumeHomeowner(userId, user.display_name?.trim() || "homeowner");
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 404 ? "No homeowner has that ID." : "Couldn't check that ID. Try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <details className="mt-5 border-t border-border pt-4 text-sm">
+      <summary className="cursor-pointer font-medium text-primary">Resume a saved homeowner</summary>
+      <form onSubmit={resume} className="mt-3 flex flex-col gap-3" noValidate>
+        <Field
+          label="Homeowner ID"
+          value={id}
+          onChange={(e) => setId(e.target.value)}
+          error={error}
+          hint="From the demo seed script"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <Button type="submit" variant="secondary" disabled={busy} className="self-start">
+          {busy ? "Checking…" : "Resume"}
+        </Button>
+      </form>
+    </details>
   );
 }

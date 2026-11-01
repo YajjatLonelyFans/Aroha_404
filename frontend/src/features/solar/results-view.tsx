@@ -146,29 +146,30 @@ function Results({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-3xl">Your solar estimate</h1>
-          {estimate.is_mock && <MockBadge what="weather" />}
+      <header className="flex flex-col gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-3xl">Your solar estimate</h1>
+            {estimate.is_mock && <MockBadge what="weather" />}
+          </div>
+          <p className="mt-2 text-muted-foreground tabular-nums">
+            <span className="font-medium text-foreground">{BINDING[estimate.binding_constraint]}</span> · Roof fits up to{" "}
+            {formatKwp(estimate.roof_kwp)}; your use needs about {formatKwp(estimate.consumption_kwp)}
+          </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Stat label="Recommended size" value={formatKwp(estimate.recommended_kwp)} note={`${recommended.panel_count} panels`} />
+        <div className="grid gap-4 sm:grid-cols-[3fr_2fr]">
+          <Stat lead label="Recommended size" value={formatKwp(estimate.recommended_kwp)} note={`${recommended.panel_count} panels`} />
           <Stat
             label="Typical year"
             value={formatKwh(recommended.annual_kwh.median)}
             note={`Range ${formatKwhRange(recommended.annual_kwh.p10, recommended.annual_kwh.p90)}`}
-          />
-          <Stat
-            label="Why this size"
-            value={BINDING[estimate.binding_constraint]}
-            note={`Roof fits up to ${formatKwp(estimate.roof_kwp)}; your use needs about ${formatKwp(estimate.consumption_kwp)}.`}
           />
         </div>
       </header>
 
       <Card className="flex flex-col gap-4">
         {estimate.options.length > 1 && (
-          <div role="tablist" aria-label="System size" className="inline-flex self-start rounded-md border border-border p-0.5">
+          <div role="tablist" aria-label="System size" className="inline-flex max-w-full self-start overflow-x-auto rounded-md border border-border p-0.5">
             {estimate.options.map((o, i) => (
               <button
                 key={o.capacity_kwp}
@@ -177,7 +178,7 @@ function Results({
                 aria-selected={i === selected}
                 onClick={() => setSelected(i)}
                 className={cn(
-                  "rounded px-3 py-1.5 text-sm font-medium tabular-nums",
+                  "whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium tabular-nums",
                   i === selected ? "bg-primary text-primary-foreground" : "hover:bg-muted",
                 )}
               >
@@ -253,12 +254,12 @@ function Results({
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+function Stat({ label, value, note, lead }: { label: string; value: string; note: string; lead?: boolean }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className="rounded-lg border border-border bg-card p-5">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 font-heading text-xl font-semibold text-primary">{value}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{note}</p>
+      <p className={cn("mt-1 font-heading font-semibold tabular-nums text-primary", lead ? "text-4xl" : "text-2xl")}>{value}</p>
+      <p className="mt-1 text-sm text-muted-foreground tabular-nums">{note}</p>
     </div>
   );
 }

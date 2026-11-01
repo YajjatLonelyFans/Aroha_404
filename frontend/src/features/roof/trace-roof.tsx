@@ -12,12 +12,19 @@ import { cn } from "@/lib/utils";
 
 import { EMPTY_MANUAL, ManualDimensionsForm, manualValid, type ManualForm } from "./manual-dimensions";
 import { DEFAULT_DETAILS, RoofDetailsForm, checkTilt, type Details } from "./roof-details";
-import { RoofMap, type RoofMapHandle, type Tool } from "./roof-map";
+import { RoofMap, type RoofMapHandle, type Shape, type Tool } from "./roof-map";
 import { RoofResult } from "./roof-result";
 import { NO_GO_KINDS, areaM2, kindLabel, sideLengthsM, toSqFt, type Drawing, type NoGoKind, type Polygon } from "./roof-shapes";
 
 type Step = "outline" | "nogo" | "details" | "result";
 type Method = "map" | "manual";
+
+const INTRO: Record<Shape, string> = {
+  box: "Press on one corner of your roof and drag to the opposite corner, like taking a screenshot. Then turn the box to line up with the roof and drag its corners to fine-tune.",
+  corners: "Click each corner of the roof. Click the first corner again to finish. Then drag corners to fine-tune.",
+};
+// A box turned by more than this is the same as one turned the other way.
+const MAX_TURN_DEG = 45;
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "outline", label: "Roof outline" },
@@ -71,6 +78,8 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
     noGo: initial.noGo.map((n, i) => ({ id: `saved-${i}`, ...n })),
   }));
   const [drawingNoGo, setDrawingNoGo] = useState(false);
+  const [shape, setShape] = useState<Shape>("box");
+  const [turn, setTurn] = useState(0); // degrees the outline has been turned since it was drawn
   const [noGoKind, setNoGoKind] = useState<NoGoKind>("water_tank");
   const [manual, setManual] = useState<ManualForm>(() => manualFrom(savedRoof));
   const [details, setDetails] = useState<Details>(() => detailsFrom(savedRoof));
@@ -78,7 +87,6 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
   const [result, setResult] = useState(savedResult);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
 
   const tool: Tool =
     method === "manual" || step === "details" || step === "result"
@@ -140,6 +148,11 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
   }
 
   const outlineArea = drawing.outline ? areaM2(drawing.outline) : null;
+
+  function turnOutline(degrees: number) {
+    mapRef.current?.rotateOutline(degrees - turn);
+    setTurn(degrees);
+  }
   const showPanels = step === "result" && method === "map" && result?.panel_layout;
 
   return (
@@ -148,10 +161,10 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
         <StepDots step={step} />
 
         {step === "outline" && method === "map" && (
-          <Panel title="Trace your roof" intro="Click each corner of the roof. Click the first corner again to finish. Then drag corners to fine-tune.">
+          <Panel title="Trace your roof" intro={INTRO[shape]}>
             <div className="rounded-md bg-muted p-3 text-sm tabular-nums">
               {outlineArea === null || !drawing.outline ? (
-                "No outline yet."
+                "No outline yet"
               ) : (
                 <>
                   <p>
@@ -166,16 +179,47 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
                 </>
               )}
             </div>
+            {drawing.outline && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between text-sm">
+                  <label htmlFor="outline-turn" className="font-medium">
+                    Turn to line up with the roof
+                  </label>
+                  <span className="tabular-nums text-muted-foreground">{turn}°</span>
+                </div>
+                <input
+                  id="outline-turn"
+                  type="range"
+                  min={-MAX_TURN_DEG}
+                  max={MAX_TURN_DEG}
+                  step={1}
+                  value={turn}
+                  onChange={(e) => turnOutline(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => go("nogo")} disabled={!drawing.outline}>
                 Next: no-go areas
               </Button>
               {drawing.outline && (
-                <Button variant="ghost" onClick={() => mapRef.current?.clearOutline()}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    mapRef.current?.clearOutline();
+                    setTurn(0);
+                  }}
+                >
                   Start again
                 </Button>
               )}
             </div>
+            {!drawing.outline && (
+              <LinkButton onClick={() => setShape(shape === "box" ? "corners" : "box")}>
+                {shape === "box" ? "Odd-shaped roof? Click corner by corner instead" : "Draw a box instead"}
+              </LinkButton>
+            )}
             <LinkButton onClick={() => setMethod("manual")}>Can&apos;t trace it? Type the size instead</LinkButton>
           </Panel>
         )}
@@ -226,7 +270,11 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
             </fieldset>
             {drawingNoGo ? (
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-sm">Click its corners on the map, then the first corner again.</p>
+                <p className="text-sm">
+                  {shape === "box"
+                    ? "Drag a box over it on the map."
+                    : "Click its corners on the map, then the first corner again."}
+                </p>
                 <Button variant="ghost" onClick={() => setDrawingNoGo(false)}>
                   Cancel
                 </Button>
@@ -313,11 +361,13 @@ export function TraceRoof({ userId, propertyId, pin, config, savedRoof, savedRes
           center={pin}
           initial={initial}
           tool={tool}
+          shape={shape}
           noGoKind={noGoKind}
           panels={showPanels ? (result!.panel_layout as unknown as FeatureCollection) : null}
           onChange={setDrawing}
           onFinish={(what) => {
             if (what === "nogo") setDrawingNoGo(false);
+            if (what === "outline") setTurn(0);
           }}
         />
       </div>

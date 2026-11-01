@@ -30,6 +30,7 @@ async def recent_logs(store: DocumentStore, user_id: str, limit: int) -> AgentLo
                 error=meko.get("error"),
                 calls=_calls(meko.get("calls")) or [],
                 commit_calls=_calls(d.get("meko_commit_calls")),
+                written=meko.get("written"),
             ),
             llm=LLMInfo(**d["llm"]),
             is_mock=d.get("is_mock", False),

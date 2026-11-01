@@ -49,3 +49,13 @@ def test_logs_only_show_that_users_turns(api):
     a, b = ready_user(api), create_user(api.client)
     chat(api, a, "How many panels fit?")
     assert api.client.get(f"/api/assistant/logs?user_id={b}").json()["logs"] == []
+
+
+def test_log_says_when_there_was_nothing_to_save(api):
+    user_id = ready_user(api)
+    chat(api, user_id, "How many panels fit?")
+    again = chat(api, user_id, "How many panels fit?")  # the same notes are already saved
+    log = next(l for l in api.client.get(f"/api/assistant/logs?user_id={user_id}").json()["logs"]
+               if l["run_id"] == again["run_id"])
+    assert log["memory"]["written"] == again["memory"]["written"] == 0
+    assert log["memory"]["commit_calls"] is None  # no save ran, and the log says why

@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 type Forecast = Schemas["ForecastResponse"];
 type Outlook = NonNullable<Forecast["daily"][number]["outlook"]>;
 
-const OUTLOOK: Record<Outlook, { label: string; className: string }> = {
-  sunny: { label: "Sunny", className: "bg-accent/25" },
-  mixed: { label: "Mixed", className: "bg-accent/10" },
-  cloudy: { label: "Cloudy", className: "bg-muted" },
-  rain: { label: "Rain", className: "bg-muted" },
+// Neutral tiles: the generation chart above is the page's one amber moment. A small sun dot marks
+// how much sun a day brings (full, half, none), with the word beside it.
+const OUTLOOK: Record<Outlook, { label: string; dot: string }> = {
+  sunny: { label: "Sunny", dot: "bg-sun" },
+  mixed: { label: "Mixed", dot: "bg-sun/45" },
+  cloudy: { label: "Cloudy", dot: "border border-muted-foreground bg-transparent" },
+  rain: { label: "Rain", dot: "border border-muted-foreground bg-transparent" },
 };
 
 function dayName(date: string): string {
@@ -32,7 +34,7 @@ export function OutlookCard({ forecast, error }: { forecast: Forecast | null; er
         Sunlight on your panels over the next week. This is a forecast; it does not change the yearly estimate above.
       </p>
       {error ? (
-        <p className="mt-3 text-sm text-muted-foreground">The outlook isn&apos;t available right now ({error}).</p>
+        <p className="mt-3 text-sm text-muted-foreground">The outlook isn&apos;t available right now ({error})</p>
       ) : !forecast ? (
         <p className="mt-3 text-sm text-muted-foreground">Loading the outlook…</p>
       ) : (
@@ -41,9 +43,12 @@ export function OutlookCard({ forecast, error }: { forecast: Forecast | null; er
             {forecast.daily.map((d) => {
               const look = d.outlook ? OUTLOOK[d.outlook] : null;
               return (
-                <li key={d.date} className={cn("flex flex-col items-center gap-0.5 rounded-md p-2 text-center", look?.className ?? "bg-muted")}>
+                <li key={d.date} className="flex flex-col items-center gap-1 rounded-md bg-muted p-2 text-center">
                   <span className="text-xs text-muted-foreground">{dayName(d.date)}</span>
-                  <span className="text-sm font-medium">{look?.label ?? "—"}</span>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                    {look && <span className={cn("inline-block size-2 rounded-full", look.dot)} aria-hidden="true" />}
+                    {look?.label ?? "—"}
+                  </span>
                   <span className="text-xs tabular-nums">
                     {d.gti_kwh_m2 == null ? "—" : `${formatNumber(d.gti_kwh_m2, 1)} kWh/m²`}
                   </span>

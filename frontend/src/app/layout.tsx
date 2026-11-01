@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Montserrat } from "next/font/google";
 
+import { MainArea } from "@/components/main-area";
 import { SiteHeader } from "@/components/site-header";
 import { AssistantLauncher } from "@/features/assistant/assistant-launcher";
 import "./globals.css";
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en-IN" className={`${inter.variable} ${montserrat.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <SiteHeader />
-        <main className="flex flex-1 flex-col">{children}</main>
+        <MainArea>{children}</MainArea>
         <AssistantLauncher />
       </body>
     </html>

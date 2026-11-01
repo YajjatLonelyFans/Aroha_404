@@ -70,7 +70,7 @@ function SchemeCard({ scheme: s }: { scheme: Scheme }) {
       {!s.counts_in_estimate && (
         <p className="rounded-md bg-muted px-3 py-2 text-sm">
           {unverified
-            ? "Needs verification: not counted in your estimate until it is checked against the official source."
+            ? "Needs verification: not counted in your estimate until it is checked against the official source"
             : "Not counted in your estimate."}
         </p>
       )}

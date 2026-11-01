@@ -159,7 +159,7 @@ export function GenerationChart({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Estimate based on {period ?? "past"} historical weather data, not a guarantee.
+        Estimate based on {period ?? "past"} historical weather data, not a guarantee
       </p>
 
       <details className="text-sm">

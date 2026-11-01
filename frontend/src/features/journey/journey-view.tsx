@@ -73,7 +73,7 @@ export function JourneyView({ userId }: { userId: string }) {
       <header>
         <h1 className="text-3xl">Subsidies and next steps</h1>
         <p className="mt-2 text-muted-foreground">
-          Which schemes fit your home, and what to do to get the panels approved and switched on.
+          Which schemes fit your home, and what to do to get the panels approved and switched on
         </p>
       </header>
 

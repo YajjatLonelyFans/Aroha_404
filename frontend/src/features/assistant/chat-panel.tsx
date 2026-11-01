@@ -171,10 +171,10 @@ export function ChatPanel({ userId, memoryEnabled, onReply }: { userId: string; 
 function AssistantMessage({ text, meta }: { text: string; meta: Extract<Message, { role: "assistant" }>["meta"] }) {
   const mem = meta.memory;
   const memoryLine = !mem.enabled
-    ? "Memory off: started fresh."
+    ? "Memory off: started fresh"
     : mem.error
       ? `Memory unavailable: ${mem.error}`
-      : `Remembered ${mem.recalled} note${mem.recalled === 1 ? "" : "s"} about you${mem.shared ? ` and ${mem.shared} shared tip${mem.shared === 1 ? "" : "s"}` : ""}${mem.written ? `; saving ${mem.written} new` : ""}.`;
+      : `Remembered ${mem.recalled} note${mem.recalled === 1 ? "" : "s"} about you${mem.shared ? ` and ${mem.shared} shared tip${mem.shared === 1 ? "" : "s"}` : ""}${mem.written ? `; saving ${mem.written} new` : ""}`;
   return (
     <div className="flex max-w-[92%] flex-col gap-1.5 self-start">
       <p className="whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-sm">{text}</p>
@@ -189,7 +189,7 @@ function AssistantMessage({ text, meta }: { text: string; meta: Extract<Message,
       </div>
       <p className={cn("text-xs", mem.error ? "text-warning" : "text-muted-foreground")}>
         {memoryLine}
-        {!meta.llm.used && meta.llm.fallback_reason && ` Template reply: ${FALLBACK[meta.llm.fallback_reason] ?? meta.llm.fallback_reason}.`}
+        {!meta.llm.used && meta.llm.fallback_reason && ` · Template reply: ${FALLBACK[meta.llm.fallback_reason] ?? meta.llm.fallback_reason}`}
       </p>
       {meta.notes.length > 0 && (
         <ul className="list-disc pl-4 text-xs text-muted-foreground">

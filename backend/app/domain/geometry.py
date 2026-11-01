@@ -10,7 +10,8 @@ from typing import Any
 import shapely
 from pyproj import Geod, Transformer
 from shapely import make_valid
-from shapely.geometry import Polygon, box, mapping, shape
+from shapely.geometry import MultiPolygon, Polygon, box, mapping, shape
+from shapely.geometry.polygon import orient
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
@@ -50,6 +51,12 @@ def to_wgs84(geom: BaseGeometry) -> BaseGeometry:
 
 
 def geodesic_area_m2(polygon_wgs84: BaseGeometry) -> float:
+    # pyproj adds or subtracts each ring by its direction, so orient them first (outer edge
+    # counter-clockwise, holes clockwise); otherwise a courtyard drawn the same way is added.
+    if isinstance(polygon_wgs84, Polygon):
+        polygon_wgs84 = orient(polygon_wgs84, 1.0)
+    elif isinstance(polygon_wgs84, MultiPolygon):
+        polygon_wgs84 = MultiPolygon([orient(p, 1.0) for p in polygon_wgs84.geoms])
     area, _ = _GEOD.geometry_area_perimeter(polygon_wgs84)
     return abs(area)
 

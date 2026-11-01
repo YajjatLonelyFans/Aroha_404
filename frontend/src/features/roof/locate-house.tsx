@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AddressSearch } from "@/features/map/address-search";
+import { CurrentLocation } from "@/features/map/current-location";
 import { MapView, type LatLon } from "@/features/map/map-view";
 import { ApiError, api, type Schemas } from "@/lib/api";
 
@@ -209,19 +210,28 @@ function PinStep({
           <h1 className="text-2xl">Find your house</h1>
           <p className="mt-2 text-muted-foreground">
             {editing
-              ? "Search for your address, then click on your roof to drop the pin. Drag the pin to adjust it."
+              ? "Search for your address or use your current location, then click on your roof to drop the pin. Drag the pin to adjust it."
               : "Your house is pinned. Next, you will trace the outline of the roof."}
           </p>
         </div>
 
         {editing && (
-          <AddressSearch
-            onPick={(place) => {
-              movePin({ lat: place.lat, lon: place.lon });
-              setAddress(place.display_name);
-              setFocusKey((k) => k + 1);
-            }}
-          />
+          <div className="flex flex-col gap-3">
+            <AddressSearch
+              onPick={(place) => {
+                movePin({ lat: place.lat, lon: place.lon });
+                setAddress(place.display_name);
+                setFocusKey((k) => k + 1);
+              }}
+            />
+            <CurrentLocation
+              onLocate={(here) => {
+                movePin(here);
+                setAddress(null); // a GPS fix has no street address
+                setFocusKey((k) => k + 1);
+              }}
+            />
+          </div>
         )}
 
         <div className="rounded-md bg-muted p-4 text-sm">

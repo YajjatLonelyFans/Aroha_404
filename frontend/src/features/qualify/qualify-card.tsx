@@ -108,7 +108,7 @@ export function QualifyCard({ displayName, initial, onSubmitted, onCancel }: Pro
                 value={answers.monthly_units_kwh}
                 onChange={(e) => set("monthly_units_kwh", e.target.value)}
                 error={showError ? error : null}
-                hint="Look for “units consumed” or “kWh” on your bill."
+                hint="Look for “units consumed” or “kWh” on your bill"
               />
             )}
             {step.key === "discom" && (
@@ -156,7 +156,7 @@ function ProgressDots({ current, total }: { current: number; total: number }) {
         <span
           key={i}
           className={cn(
-            "h-2.5 rounded-full transition-all",
+            "h-2.5 rounded-full transition-colors",
             i === current ? "w-6 bg-primary" : i < current ? "w-2.5 bg-accent" : "w-2.5 bg-border",
           )}
         />

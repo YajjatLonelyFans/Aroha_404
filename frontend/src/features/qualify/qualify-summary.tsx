@@ -67,7 +67,7 @@ export function QualifySummary({ userId, username, returning, onChangeAnswers }:
   const { user } = state;
   return (
     <Card className="w-full max-w-xl">
-      {returning && <p className="text-sm text-muted-foreground">Welcome back, {username}.</p>}
+      {returning && <p className="text-sm text-muted-foreground">Welcome back, {username}</p>}
       {user.eligible_to_continue ? (
         <>
           <h1 className="mt-1 text-2xl">Your home can go on to the roof check</h1>

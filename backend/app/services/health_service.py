@@ -1,8 +1,9 @@
 """Builds the `/api/health` report: liveness plus the state of each dependency.
 
 Without `deep`, external services are only checked for configuration. With
-`deep=true` (the pre-demo check) each one is called once: Open-Meteo, the
-Gemini model lookup (uses no generation quota) and a Meko connection.
+`deep=true` (the pre-demo check) each one is called once: Open-Meteo, Nominatim's
+status endpoint, one satellite tile, the Gemini model lookup (uses no generation
+quota) and a Meko connection.
 """
 
 import asyncio
@@ -16,6 +17,7 @@ from app.core.settings import Settings, is_configured
 from app.db.client import ping
 from app.integrations.llm.gemini import GEMINI_URL
 from app.integrations.meko.base import MemoryProvider, MemoryUnavailable
+from app.integrations.tiles.base import TileNotFound, TileProvider, TilesUnavailable
 from app.integrations.tiles.factory import tile_source
 from app.schemas.health import AssumptionsStatus, DependencyStatus, HealthResponse
 
@@ -53,12 +55,30 @@ def _config_status(*values: str, hint: str, is_mock: bool) -> DependencyStatus:
     return DependencyStatus(status="not_configured", detail=hint)
 
 
-def _imagery_status(settings: Settings) -> DependencyStatus:
+async def _imagery_status(settings: Settings, tiles: TileProvider | None, deep: bool) -> DependencyStatus:
     source = tile_source(settings)
     if source is None and not settings.use_mock_tiles:
         return DependencyStatus(status="not_configured", detail="MAP_TILES_PROVIDER must be 'maptiler' or 'esri'")
-    return _config_status(source.api_key if source else "", is_mock=settings.use_mock_tiles,
-                          hint=f"Set {source.key_env} for satellite imagery" if source else "")
+    status = _config_status(source.api_key if source else "", is_mock=settings.use_mock_tiles,
+                            hint=f"Set {source.key_env} for satellite imagery" if source else "")
+    if not deep or status.status != "configured" or status.is_mock or tiles is None:
+        return status
+    try:
+        # One zoom-1 tile through the same adapter the map uses (its own key and retry).
+        await asyncio.wait_for(tiles.get_tile(1, 1, 0), PROBE_TIMEOUT_S * 2)
+        return DependencyStatus(status="ok")
+    except (TilesUnavailable, TileNotFound, TimeoutError) as exc:
+        return DependencyStatus(status="error", detail=getattr(exc, "message", type(exc).__name__))
+
+
+async def _nominatim_status(settings: Settings, deep: bool) -> DependencyStatus:
+    status = _config_status(settings.nominatim_user_agent, hint="Set NOMINATIM_USER_AGENT (app name and contact email)",
+                            is_mock=settings.use_mock_geocoding)
+    if not deep or status.status != "configured" or status.is_mock:
+        return status
+    # Nominatim's own status endpoint: one light request, within its usage policy.
+    return await _http_probe(settings.nominatim_base_url.rstrip("/") + "/status",
+                             params={"format": "json"}, headers={"User-Agent": settings.nominatim_user_agent})
 
 
 async def _open_meteo_status(settings: Settings, deep: bool) -> DependencyStatus:
@@ -104,22 +124,21 @@ async def check_health(
     assumptions: Assumptions,
     deep: bool = False,
     memory: MemoryProvider | None = None,
+    tiles: TileProvider | None = None,
 ) -> HealthResponse:
-    mongo_s, meteo_s, llm_s, meko_s = await asyncio.gather(
+    mongo_s, meteo_s, llm_s, meko_s, nominatim_s, imagery_s = await asyncio.gather(
         _mongo_status(mongo),
         _open_meteo_status(settings, deep),
         _llm_status(settings, deep),
         _meko_status(settings, memory, deep),
+        _nominatim_status(settings, deep),
+        _imagery_status(settings, tiles, deep),
     )
     dependencies = {
         "mongo": mongo_s,
         "open_meteo": meteo_s,
-        "nominatim": _config_status(
-            settings.nominatim_user_agent,
-            hint="Set NOMINATIM_USER_AGENT (app name and contact email)",
-            is_mock=settings.use_mock_geocoding,
-        ),
-        "satellite_imagery": _imagery_status(settings),
+        "nominatim": nominatim_s,
+        "satellite_imagery": imagery_s,
         "meko": meko_s,
         "llm": llm_s,
     }

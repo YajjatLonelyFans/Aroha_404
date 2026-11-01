@@ -144,3 +144,85 @@ async def test_deep_health_reports_meko_outage():
 async def test_shallow_health_makes_no_calls():
     h = await check_health(Settings(**SETTINGS), None, load_assumptions(), deep=False, memory=FailingMemory())
     assert h.dependencies["meko"].status == "configured" and h.dependencies["llm"].status == "configured"
+
+
+# --- deep checks for address search and imagery ---------------------------------------------
+
+class _Tiles:
+    is_mock, attribution, max_zoom = False, "credit", 19
+
+    def __init__(self, fail=False):
+        self.fail, self.calls = fail, 0
+
+    async def get_tile(self, z, x, y):
+        from app.integrations.tiles.base import Tile, TilesUnavailable
+        self.calls += 1
+        if self.fail:
+            raise TilesUnavailable("Satellite imagery rejected our key.")
+        return Tile(b"jpg", "image/jpeg")
+
+
+DEEP = dict(SETTINGS, nominatim_user_agent="Aroha-test/0.1 (test@example.com)", maptiler_api_key="mt")
+
+
+@respx.mock
+async def test_deep_health_calls_nominatim_status_and_one_tile():
+    respx.get(url__startswith=GEMINI_URL).mock(return_value=httpx.Response(200, json={}))
+    respx.get(url__startswith="https://api.open-meteo.com").mock(return_value=httpx.Response(200, json={}))
+    nominatim = respx.get("https://nominatim.openstreetmap.org/status").mock(return_value=httpx.Response(200, json={}))
+    tiles = _Tiles()
+    h = await check_health(Settings(**DEEP), None, load_assumptions(), deep=True, tiles=tiles)
+    assert h.dependencies["nominatim"].status == "ok" and h.dependencies["satellite_imagery"].status == "ok"
+    assert nominatim.calls.last.request.headers["user-agent"].startswith("Aroha-test") and tiles.calls == 1
+
+
+@respx.mock
+async def test_deep_health_reports_failing_imagery():
+    respx.get(url__startswith=GEMINI_URL).mock(return_value=httpx.Response(200, json={}))
+    respx.get(url__startswith="https://api.open-meteo.com").mock(return_value=httpx.Response(200, json={}))
+    respx.get("https://nominatim.openstreetmap.org/status").mock(return_value=httpx.Response(503))
+    h = await check_health(Settings(**DEEP), None, load_assumptions(), deep=True, tiles=_Tiles(fail=True))
+    assert h.dependencies["satellite_imagery"].status == "error"
+    assert "rejected our key" in h.dependencies["satellite_imagery"].detail
+    assert h.dependencies["nominatim"].status == "error"
+
+
+async def test_shallow_health_does_not_fetch_tiles():
+    tiles = _Tiles()
+    h = await check_health(Settings(**DEEP), None, load_assumptions(), deep=False, tiles=tiles)
+    assert h.dependencies["satellite_imagery"].status == "configured" and tiles.calls == 0
+
+
+# --- a slow search must not throw away the finished ones ---------------------------------------
+
+class OneSlowAgentMemory(MockMemoryProvider):
+    """Weather's search outlasts the budget; every other agent answers at once with one note."""
+
+    def session(self):
+        cm = super().session()
+
+        class Wrap:
+            async def __aenter__(self):
+                from app.integrations.meko.base import MemoryHit
+                s = await cm.__aenter__()
+
+                async def search(conversation_id, query, agent_ids, k=3):
+                    if agent_ids == ["aroha:weather"]:
+                        await asyncio.sleep(5)
+                    return [MemoryHit(f"m-{agent_ids[0]}", "Prefers the cheaper option.", agent_ids[0], {}, 0.9)]
+                s.search = search
+                return s
+
+            async def __aexit__(self, *exc):
+                return await cm.__aexit__(*exc)
+        return Wrap()
+
+
+def test_slow_search_keeps_the_finished_ones(api):
+    api.client.app.state.memory = OneSlowAgentMemory()
+    api.client.app.state.settings.meko_recall_timeout_s = 0.5
+    user_id = ready_user(api)
+    body = chat(api, user_id, "Hi, where was I?")  # a greeting searches all five agents
+    assert len(body["agents"]) == 5
+    assert body["memory"]["recalled"] == 4, "four agents answered in time; only weather's search was dropped"
+    assert any("some earlier notes were skipped" in n for n in body["notes"])

@@ -95,7 +95,7 @@ export function ManualDimensionsForm({
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Panel positions are not drawn for typed sizes, so the count is approximate.
+        Panel positions are not drawn for typed sizes, so the count is approximate
       </p>
     </div>
   );

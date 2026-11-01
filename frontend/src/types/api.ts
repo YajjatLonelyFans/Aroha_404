@@ -420,6 +420,8 @@ export interface components {
             calls: components["schemas"]["MemoryCallOut"][];
             /** Commit Calls */
             commit_calls: components["schemas"]["MemoryCallOut"][] | null;
+            /** Written */
+            written?: number | null;
         };
         /** AgentLogOut */
         AgentLogOut: {
@@ -1489,7 +1491,7 @@ export interface operations {
     health_api_health_get: {
         parameters: {
             query?: {
-                /** @description Also call Open-Meteo, Gemini (model lookup) and Meko once each */
+                /** @description Also call Open-Meteo, Nominatim, the imagery provider, Gemini (model lookup) and Meko once each */
                 deep?: boolean;
             };
             header?: never;

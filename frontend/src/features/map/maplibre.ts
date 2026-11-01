@@ -41,6 +41,7 @@ export async function createMap(
   container: HTMLElement,
   config: Schemas["MapConfig"],
   view: { center: [number, number]; zoom: number },
+  onTileError?: () => void,
 ): Promise<MapLibreMap> {
   const { Map, NavigationControl, AttributionControl, ScaleControl, getVersion, setWorkerUrl } = await import("maplibre-gl");
   setWorkerUrl(`${WORKER_URL}?v=${getVersion()}`);
@@ -59,9 +60,14 @@ export async function createMap(
   // A slow imagery provider can fail a few tiles (the backend answers 503). The map just shows
   // those squares blank until it is moved, so log them quietly; anything else is a real error.
   map.on("error", ({ error }) => {
-    if (String(error?.message ?? "").includes("/api/tiles/satellite/")) console.warn("Satellite tile not loaded:", error.message);
-    else console.error(error);
+    if (String(error?.message ?? "").includes("/api/tiles/satellite/")) {
+      console.warn("Satellite tile not loaded:", error.message);
+      onTileError?.();
+    } else console.error(error);
   });
   if (!map.loaded()) await map.once("load");
   return map;
 }
+
+/** Imagery counts as failing after this many tiles in one map session (a single slow tile is normal). */
+export const TILE_FAILURES_BEFORE_NOTICE = 3;

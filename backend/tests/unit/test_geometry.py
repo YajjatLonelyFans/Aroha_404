@@ -26,6 +26,14 @@ def test_geodesic_area_of_known_rectangle_within_1_percent():
     assert geodesic_area_m2(outline) == pytest.approx(50, rel=0.01)
 
 
+@pytest.mark.parametrize("hole_clockwise", [True, False])
+def test_geodesic_area_subtracts_a_courtyard_whatever_the_ring_direction(hole_clockwise):
+    outer = list(to_wgs84(metric_rect(20, 20)).exterior.coords)
+    hole = list(to_wgs84(metric_rect(5, 5, 5, 5)).exterior.coords)
+    roof = Polygon(outer, [hole[::-1] if hole_clockwise else hole])
+    assert geodesic_area_m2(roof) == pytest.approx(400 - 25, rel=0.01)
+
+
 def test_projection_round_trip():
     rect = metric_rect(10, 5)
     back = to_metric(to_wgs84(rect))

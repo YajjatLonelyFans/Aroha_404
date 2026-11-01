@@ -8,7 +8,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import type { GeoJSONStoreFeatures, TerraDraw } from "terra-draw";
 
 import { MockBadge } from "@/components/mock-badge";
-import { AMBER, FOREST, NO_GO_GREY, ROOF_ZOOM, createMap } from "@/features/map/maplibre";
+import { AMBER, FOREST, NO_GO_GREY, ROOF_ZOOM, TILE_FAILURES_BEFORE_NOTICE, createMap } from "@/features/map/maplibre";
 import type { LatLon } from "@/features/map/map-view";
 import type { Schemas } from "@/lib/api";
 
@@ -16,10 +16,14 @@ import type { Drawing, NoGoKind, Polygon } from "./roof-shapes";
 
 /** What the map lets the person do right now. */
 export type Tool = "draw-outline" | "draw-nogo" | "edit" | "view";
+/** How shapes are drawn: drag a box (like a screenshot), or click corner by corner. */
+export type Shape = "box" | "corners";
 
 export type RoofMapHandle = {
   clearOutline: () => void;
   removeNoGo: (id: string) => void;
+  /** Turns the roof outline clockwise about its centre, by this many degrees. */
+  rotateOutline: (degrees: number) => void;
 };
 
 type Props = {
@@ -28,6 +32,7 @@ type Props = {
   /** Shapes to show when the map opens (a saved drawing); later changes come from drawing. */
   initial: { outline: Polygon | null; noGo: { kind: NoGoKind; geometry: Polygon }[] };
   tool: Tool;
+  shape: Shape;
   noGoKind: NoGoKind;
   /** Panel rectangles from the backend, shown on top of the roof. */
   panels: FeatureCollection | null;
@@ -37,8 +42,13 @@ type Props = {
   ref?: Ref<RoofMapHandle>;
 };
 
+// Each kind of shape has a corner-by-corner mode and a drag-a-box mode.
 const OUTLINE = "outline";
+const OUTLINE_BOX = "outline-box";
 const NOGO = "nogo";
+const NOGO_BOX = "nogo-box";
+const isOutline = (mode: unknown) => mode === OUTLINE || mode === OUTLINE_BOX;
+const isNoGo = (mode: unknown) => mode === NOGO || mode === NOGO_BOX;
 // terra-draw closes a shape when a click lands this close to its first corner (default 40 px),
 // which cut small tanks and heaters short after three corners.
 const CLOSE_DISTANCE_PX = 12;
@@ -47,25 +57,27 @@ function snapshot(draw: TerraDraw): Drawing {
   const done = draw
     .getSnapshot()
     .filter((f) => f.geometry.type === "Polygon" && !f.properties.currentlyDrawing);
-  const outline = done.find((f) => f.properties.mode === OUTLINE);
+  const outline = done.find((f) => isOutline(f.properties.mode));
   return {
     outline: outline ? (outline.geometry as Polygon) : null,
     noGo: done
-      .filter((f) => f.properties.mode === NOGO)
+      .filter((f) => isNoGo(f.properties.mode))
       .map((f) => ({ id: String(f.id), kind: (f.properties.kind as NoGoKind) ?? "other", geometry: f.geometry as Polygon })),
   };
 }
 
 /**
- * Satellite map for tracing the roof (amber) and no-go areas (grey), with corners that can be
- * dragged, and the backend's panel layout drawn on top. Uses terra-draw for the drawing.
+ * Satellite map for tracing the roof (amber) and no-go areas (grey), as a dragged box or corner by
+ * corner, with corners that can be dragged, and the backend's panel layout drawn on top. Uses
+ * terra-draw for the drawing.
  */
-export function RoofMap({ config, center, initial, tool, noGoKind, panels, onChange, onFinish, ref }: Props) {
+export function RoofMap({ config, center, initial, tool, shape, noGoKind, panels, onChange, onFinish, ref }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const drawRef = useRef<TerraDraw | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [tileFailures, setTileFailures] = useState(0);
 
   const latest = useRef({ noGoKind, onChange, onFinish, initial });
   useEffect(() => {
@@ -76,7 +88,7 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
     clearOutline() {
       const draw = drawRef.current;
       if (!draw) return;
-      const ids = draw.getSnapshot().filter((f) => f.properties.mode === OUTLINE).map((f) => f.id!);
+      const ids = draw.getSnapshot().filter((f) => isOutline(f.properties.mode)).map((f) => f.id!);
       if (ids.length) draw.removeFeatures(ids);
       latest.current.onChange(snapshot(draw));
     },
@@ -84,6 +96,23 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
       const draw = drawRef.current;
       if (!draw) return;
       if (draw.getSnapshotFeature(id)) draw.removeFeatures([id]);
+      latest.current.onChange(snapshot(draw));
+    },
+    rotateOutline(degrees) {
+      const draw = drawRef.current;
+      const outline = draw?.getSnapshot().find((f) => isOutline(f.properties.mode) && !f.properties.currentlyDrawing);
+      if (!draw || !outline) return;
+      const corners = (outline.geometry as Polygon).coordinates[0].slice(0, -1);
+      const centre = [0, 1].map((i) => corners.reduce((sum, c) => sum + c[i], 0) / corners.length);
+      // Deselect first so the corner handles are redrawn on the turned shape.
+      if (outline.properties.selected) draw.deselectFeature(outline.id!);
+      // Turned on the flat map, so the box keeps its shape on screen.
+      draw.transformFeatureGeometry(outline.id!, {
+        projection: "web-mercator",
+        origin: centre,
+        type: "rotate",
+        options: { angle: -degrees }, // terra-draw turns anticlockwise for a positive angle
+      });
       latest.current.onChange(snapshot(draw));
     },
   }));
@@ -105,7 +134,9 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
       map = null;
     };
     (async () => {
-      map = await createMap(containerRef.current!, config, { center: [center.lon, center.lat], zoom: ROOF_ZOOM });
+      map = await createMap(containerRef.current!, config, { center: [center.lon, center.lat], zoom: ROOF_ZOOM }, () =>
+        setTileFailures((n) => n + 1),
+      );
       if (cancelled) return dispose();
       const [td, { TerraDrawMapLibreGLAdapter }] = await Promise.all([
         import("terra-draw"),
@@ -115,6 +146,8 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
       const notSelfIntersecting = (feature: GeoJSONStoreFeatures, { updateType }: { updateType: string }) =>
         updateType === "finish" || updateType === "commit" ? td.ValidateNotSelfIntersecting(feature) : { valid: true };
       const corners = { draggable: true, midpoints: true, deletable: true };
+      const outlineStyle = { fillColor: AMBER, fillOpacity: 0.12, outlineColor: AMBER, outlineWidth: 3 } as const;
+      const noGoStyle = { fillColor: NO_GO_GREY, fillOpacity: 0.55, outlineColor: "#1f2937", outlineWidth: 2 } as const;
       draw = new td.TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),
         modes: [
@@ -122,20 +155,22 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
             modeName: OUTLINE,
             pointerDistance: CLOSE_DISTANCE_PX,
             validation: notSelfIntersecting,
-            styles: { fillColor: AMBER, fillOpacity: 0.12, outlineColor: AMBER, outlineWidth: 3,
-              closingPointColor: AMBER, closingPointOutlineColor: FOREST },
+            styles: { ...outlineStyle, closingPointColor: AMBER, closingPointOutlineColor: FOREST },
           }),
+          new td.TerraDrawRectangleMode({ modeName: OUTLINE_BOX, drawInteraction: "click-drag", styles: outlineStyle }),
           new td.TerraDrawPolygonMode({
             modeName: NOGO,
             pointerDistance: CLOSE_DISTANCE_PX,
             validation: notSelfIntersecting,
-            styles: { fillColor: NO_GO_GREY, fillOpacity: 0.55, outlineColor: "#1f2937", outlineWidth: 2,
-              closingPointColor: NO_GO_GREY, closingPointOutlineColor: "#1f2937" },
+            styles: { ...noGoStyle, closingPointColor: NO_GO_GREY, closingPointOutlineColor: "#1f2937" },
           }),
+          new td.TerraDrawRectangleMode({ modeName: NOGO_BOX, drawInteraction: "click-drag", styles: noGoStyle }),
           new td.TerraDrawSelectMode({
             flags: {
               [OUTLINE]: { feature: { draggable: false, coordinates: corners } },
+              [OUTLINE_BOX]: { feature: { draggable: false, coordinates: corners } },
               [NOGO]: { feature: { draggable: true, coordinates: corners } },
+              [NOGO_BOX]: { feature: { draggable: true, coordinates: corners } },
             },
             styles: { selectedPolygonColor: AMBER, selectedPolygonOutlineColor: FOREST, selectedPointColor: FOREST,
               selectedPointOutlineColor: "#ffffff", midPointColor: AMBER, midPointOutlineColor: FOREST },
@@ -158,12 +193,12 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
       current.on("finish", (id) => {
         const feature = current.getSnapshotFeature(id);
         if (!feature) return;
-        if (feature.properties.mode === OUTLINE) {
+        if (isOutline(feature.properties.mode)) {
           // One roof outline at a time: a new one replaces the old.
-          const older = current.getSnapshot().filter((f) => f.properties.mode === OUTLINE && f.id !== id).map((f) => f.id!);
+          const older = current.getSnapshot().filter((f) => isOutline(f.properties.mode) && f.id !== id).map((f) => f.id!);
           if (older.length) current.removeFeatures(older);
           latest.current.onFinish("outline");
-        } else if (feature.properties.mode === NOGO) {
+        } else if (isNoGo(feature.properties.mode)) {
           current.updateFeatureProperties(id, { kind: latest.current.noGoKind });
           latest.current.onFinish("nogo");
         }
@@ -200,9 +235,15 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
   useEffect(() => {
     const draw = drawRef.current;
     if (!ready || !draw) return;
-    const mode = { "draw-outline": OUTLINE, "draw-nogo": NOGO, edit: "select", view: "static" }[tool];
+    const box = shape === "box";
+    const mode = {
+      "draw-outline": box ? OUTLINE_BOX : OUTLINE,
+      "draw-nogo": box ? NOGO_BOX : NOGO,
+      edit: "select",
+      view: "static",
+    }[tool];
     if (draw.getMode() !== mode) draw.setMode(mode);
-  }, [ready, tool]);
+  }, [ready, tool, shape]);
 
   // Show the panel layout.
   useEffect(() => {
@@ -223,6 +264,12 @@ export function RoofMap({ config, center, initial, tool, noGoKind, panels, onCha
       {(!config.satellite_available || failed) && (
         <p className="absolute inset-x-3 top-3 rounded-md bg-card/95 px-3 py-2 text-sm shadow-sm">
           {failed ? "The map could not load in this browser." : config.detail}
+        </p>
+      )}
+      {config.satellite_available && !failed && tileFailures >= TILE_FAILURES_BEFORE_NOTICE && (
+        <p role="status" className="absolute inset-x-3 bottom-10 rounded-md bg-card/95 px-3 py-2 text-sm shadow-sm">
+          Satellite imagery isn&apos;t loading right now. Use &ldquo;Type the size instead&rdquo; to enter the roof&apos;s
+          length and width.
         </p>
       )}
     </div>

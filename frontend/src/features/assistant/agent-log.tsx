@@ -55,7 +55,7 @@ export function AgentLog({ userId, refreshKey }: { userId: string; refreshKey: n
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">The last 10 turns, newest first.</p>
+        <p className="text-sm text-muted-foreground">The last 10 turns, newest first</p>
         <Button variant="ghost" className="h-8 px-3" onClick={() => void refresh()} disabled={loading}>
           {loading ? "Loading…" : "Refresh"}
         </Button>
@@ -95,9 +95,11 @@ export function AgentLog({ userId, refreshKey }: { userId: string; refreshKey: n
             {log.memory.enabled && log.memory.live && (
               log.memory.commit_calls ? (
                 log.memory.commit_calls.length > 0 && <Calls title="Saved after the reply" calls={log.memory.commit_calls} />
-              ) : (
-                <p className="mt-1 text-muted-foreground">Saving after the reply…</p>
-              )
+              ) : log.memory.written === 0 ? (
+                <p className="mt-1 text-muted-foreground">Nothing new to save</p>
+              ) : log.memory.written ? (
+                <p className="mt-1 text-muted-foreground">Saving {log.memory.written} after the reply…</p>
+              ) : null
             )}
 
             <p className="mt-2 text-muted-foreground">

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { MockBadge } from "@/components/mock-badge";
 import type { Schemas } from "@/lib/api";
 
-import { AMBER, CITY_ZOOM, DELHI_CENTER, HOUSE_ZOOM, createMap } from "./maplibre";
+import { AMBER, CITY_ZOOM, DELHI_CENTER, HOUSE_ZOOM, TILE_FAILURES_BEFORE_NOTICE, createMap } from "./maplibre";
 
 export type LatLon = { lat: number; lon: number };
 
@@ -28,6 +28,7 @@ export function MapView({ config, pin, focusKey, editable, onPinChange }: Props)
   const markerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [tileFailures, setTileFailures] = useState(0);
 
   // Latest values for the map's event handlers, which are bound once.
   const latest = useRef({ editable, onPinChange });
@@ -39,7 +40,9 @@ export function MapView({ config, pin, focusKey, editable, onPinChange }: Props)
   useEffect(() => {
     let cancelled = false;
     let map: MapLibreMap | null = null;
-    createMap(containerRef.current!, config, { center: DELHI_CENTER, zoom: CITY_ZOOM })
+    createMap(containerRef.current!, config, { center: DELHI_CENTER, zoom: CITY_ZOOM }, () =>
+      setTileFailures((n) => n + 1),
+    )
       .then((created) => {
         map = created;
         if (cancelled) return created.remove();
@@ -106,6 +109,12 @@ export function MapView({ config, pin, focusKey, editable, onPinChange }: Props)
         <div className="absolute left-3 top-3">
           <MockBadge what="satellite imagery" />
         </div>
+      )}
+      {config.satellite_available && !failed && tileFailures >= TILE_FAILURES_BEFORE_NOTICE && (
+        <p role="status" className="absolute inset-x-3 bottom-10 rounded-md bg-card/95 px-3 py-2 text-sm shadow-sm">
+          Satellite imagery isn&apos;t loading right now. Search your address or click where your house is: the pin still
+          works without the picture.
+        </p>
       )}
       {(!config.satellite_available || failed) && (
         <p className="absolute inset-x-3 top-3 rounded-md bg-card/95 px-3 py-2 text-sm shadow-sm">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { setAssistantOpen, useAssistantOpen } from "@/lib/assistant-store";
 import { useMemoryEnabled } from "@/lib/memory-pref";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -11,21 +12,22 @@ import { ChatPanel } from "./chat-panel";
 import { MemoryToggle } from "./memory-toggle";
 
 /**
- * "Ask Aroha": a chat drawer on every page once the homeowner has a profile, with an agent log tab.
- * It lives in the root layout, so the conversation carries over as the person moves between pages.
+ * "Ask Aroha": a chat drawer below the header on every page once the homeowner has a profile, with an
+ * agent log tab. The header button opens it. It lives in the root layout, so the conversation carries
+ * over as the person moves between pages.
  */
 export function AssistantLauncher() {
   const session = useSession();
   const userId = session?.userId ?? null;
   const [enabled] = useMemoryEnabled(userId);
-  const [open, setOpen] = useState(false);
+  const open = useAssistantOpen();
   const [tab, setTab] = useState<"chat" | "log">("chat");
   const [replies, setReplies] = useState(0);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") setAssistantOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -35,21 +37,13 @@ export function AssistantLauncher() {
 
   return (
     <>
-      {!open && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-40 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          Ask Aroha
-        </button>
-      )}
       {/* Stays mounted while closed, so a reply that arrives after closing is not lost. */}
       <aside
           aria-label="Aroha assistant"
           hidden={!open}
           className={cn(
-            "fixed inset-y-0 right-0 z-50 w-full flex-col border-l border-border bg-card shadow-2xl sm:w-[420px]",
+            // Below the sticky header (h-16), so the header and its navigation stay usable.
+            "fixed bottom-0 right-0 top-16 z-30 w-full flex-col border-l border-border bg-card shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:w-[420px]",
             open ? "flex" : "hidden",
           )}
         >
@@ -60,7 +54,7 @@ export function AssistantLauncher() {
             </div>
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => setAssistantOpen(false)}
               aria-label="Close the assistant"
               className="rounded-md px-2 py-1 text-xl leading-none text-muted-foreground hover:bg-muted"
             >

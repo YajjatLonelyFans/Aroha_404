@@ -103,3 +103,15 @@ function subscribe(onChange: () => void): () => void {
 export function useSession(): Session | null | undefined {
   return useSyncExternalStore<Session | null | undefined>(subscribe, getSession, () => undefined);
 }
+
+/**
+ * Sign in as a homeowner who already exists in the backend (e.g. the demo's seeded returning
+ * homeowner, made by `python -m scripts.seed_demo`). Demo-grade, like the rest of this sign-in.
+ */
+export function resumeHomeowner(userId: string, username: string): Session {
+  const session: Session = { email: `homeowner-${userId}@aroha.local`, username, userId };
+  write(SESSION_KEY, JSON.stringify(session));
+  write(KNOWN_KEY, JSON.stringify({ ...readKnown(), [session.email]: userId }));
+  emit();
+  return session;
+}

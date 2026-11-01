@@ -52,8 +52,8 @@ export function RoofDetailsForm({
         />
         <p className="text-sm text-muted-foreground">
           {value.roofType === "flat"
-            ? "Panels go on frames tilted towards the south."
-            : "Panels lie flat on the slope, facing the way it faces."}
+            ? "Panels go on frames tilted towards the south"
+            : "Panels lie flat on the slope, facing the way it faces"}
         </p>
       </fieldset>
 
@@ -91,7 +91,7 @@ export function RoofDetailsForm({
 
       <fieldset>
         <legend className="font-medium">Do taller buildings or trees shade the roof?</legend>
-        <p className="mt-1 text-sm text-muted-foreground">Think about each side of the house during the day.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Think about each side of the house during the day</p>
         <div className="mt-3 flex flex-col gap-3">
           {SIDES.map((side) => (
             <div key={side.value} className="flex flex-wrap items-center justify-between gap-2">
